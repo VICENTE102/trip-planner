@@ -1,0 +1,40 @@
+import { Icon } from "./Icon";
+import type { IconName } from "./Icon";
+
+type ExternalLinkVariant = "primary" | "secondary" | "activity" | "location";
+
+interface ExternalLinkButtonProps {
+  href: string;
+  label: string;
+  icon?: IconName;
+  variant?: ExternalLinkVariant;
+}
+
+// Fixed semantic colors — these are action types, not trip-category colors,
+// so they stay the same regardless of Económico/Equilibrado/Cómodo.
+const VARIANT_CLASSES: Record<ExternalLinkVariant, string> = {
+  primary:
+    "bg-sunset-500 text-white shadow-sm hover:-translate-y-0.5 hover:bg-sunset-600 hover:shadow-md active:translate-y-0",
+  secondary: "bg-lagoon-50 text-lagoon-700 hover:bg-lagoon-100",
+  activity: "bg-rose-50 text-rose-700 hover:bg-rose-100",
+  location: "bg-blue-50 text-blue-700 hover:bg-blue-100",
+};
+
+export function ExternalLinkButton({
+  href,
+  label,
+  icon = "externalLink",
+  variant = "secondary",
+}: ExternalLinkButtonProps) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${VARIANT_CLASSES[variant]}`}
+    >
+      <Icon name={icon} size={16} />
+      {label}
+    </a>
+  );
+}

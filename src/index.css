@@ -1,0 +1,55 @@
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-sunset-50: #fff8f0;
+  --color-sunset-100: #ffe8de;
+  --color-sunset-200: #ffd1be;
+  --color-sunset-400: #ff9a78;
+  --color-sunset-500: #ff7e5f;
+  --color-sunset-600: #f2603d;
+  --color-sunset-700: #d1471f;
+
+  --color-lagoon-50: #ecfdfa;
+  --color-lagoon-100: #cff7f1;
+  --color-lagoon-400: #2dd4c4;
+  --color-lagoon-500: #14b8a6;
+  --color-lagoon-600: #0f9488;
+  --color-lagoon-700: #0c766d;
+
+  --color-ink-900: #3f2e29;
+  --color-ink-700: #5c4a42;
+  --color-ink-500: #8a7a72;
+  --color-ink-200: #e8dcd3;
+
+  --font-heading: "Baloo 2", "system-ui", sans-serif;
+  --font-body: "Nunito", "system-ui", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--color-sunset-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.45s ease-out both;
+}
