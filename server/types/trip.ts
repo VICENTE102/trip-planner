@@ -77,6 +77,7 @@ export interface ScoreBreakdown {
 export interface TripProposal {
   type: ProposalType;
   score: number;
+  rank: number;
   scoreBreakdown: ScoreBreakdown;
   flight: FlightOffer;
   accommodation: AccommodationOffer;
