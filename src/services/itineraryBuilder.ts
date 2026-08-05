@@ -23,11 +23,11 @@ export function buildItinerary(
 
   for (let day = 1; day <= totalDays; day++) {
     const isArrivalDay = day === 1;
-    const morning = isArrivalDay
-      ? `Llegada a ${params.destination}, traslado y registro en el hotel`
+    const morningActivity = isArrivalDay
+      ? { id: "llegada", text: `Llegada a ${params.destination}, traslado y registro en el hotel` }
       : pickMorningActivity(params.destination, tier, params.preferences, random);
-    const afternoon = isArrivalDay
-      ? `Primer paseo de orientación por los alrededores del alojamiento`
+    const afternoonActivity = isArrivalDay
+      ? { id: "orientacion", text: "Primer paseo de orientación por los alrededores del alojamiento" }
       : pickAfternoonActivity(params.destination, tier, params.preferences, random);
     const night = pickNightActivity(tier, params.preferences, random);
     const restaurant = buildRestaurant(tier, random);
@@ -36,9 +36,11 @@ export function buildItinerary(
       dayNumber: day,
       date: addDays(params.departureDate, day - 1),
       isArrivalDay,
-      morning,
+      morning: morningActivity.text,
+      morningActivityId: morningActivity.id,
       restaurant,
-      afternoon,
+      afternoon: afternoonActivity.text,
+      afternoonActivityId: afternoonActivity.id,
       night,
     });
   }

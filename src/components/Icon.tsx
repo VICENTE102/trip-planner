@@ -7,12 +7,16 @@ export type IconName =
   | "sun"
   | "compass"
   | "moon"
-  | "externalLink";
+  | "externalLink"
+  | "footprint"
+  | "utensils";
 
 interface IconProps {
   name: IconName;
   size?: number;
   className?: string;
+  /** Solid fill instead of the default thin stroke — for spots that need more visual weight */
+  filled?: boolean;
 }
 
 const PATHS: Record<IconName, ReactNode> = {
@@ -54,17 +58,29 @@ const PATHS: Record<IconName, ReactNode> = {
       <line x1="10" y1="14" x2="21" y2="3" />
     </>
   ),
+  footprint: (
+    <>
+      <ellipse cx="9.5" cy="7.2" rx="3" ry="4" />
+      <ellipse cx="15" cy="16.5" rx="3.4" ry="4.8" />
+    </>
+  ),
+  utensils: (
+    <>
+      <path d="M4 2v6a1 1 0 0 0 1 1h0a1 1 0 0 0 1-1V2M6 9v13" />
+      <path d="M17 2c-1.5 1.5-2 3.5-2 6 0 1.5 1 2.5 2 3v11" />
+    </>
+  ),
 };
 
-export function Icon({ name, size = 20, className = "" }: IconProps) {
+export function Icon({ name, size = 20, className = "", filled = false }: IconProps) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
+      fill={filled ? "currentColor" : "none"}
+      stroke={filled ? "none" : "currentColor"}
+      strokeWidth={filled ? 0 : 2}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}

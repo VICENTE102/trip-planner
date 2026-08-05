@@ -27,8 +27,8 @@ export function PreferenceChips({ selected, onChange }: PreferenceChipsProps) {
             aria-pressed={isSelected}
             className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
               isSelected
-                ? "border-lagoon-500 bg-lagoon-500 text-white"
-                : "border-ink-200 bg-white text-ink-700 hover:border-lagoon-400"
+                ? "border-lagoon-400 bg-lagoon-400 text-ink-900"
+                : "border-white/30 bg-white/5 text-white/85 hover:border-lagoon-300 hover:bg-white/10"
             }`}
           >
             {preference}

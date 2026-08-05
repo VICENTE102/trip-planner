@@ -6,6 +6,7 @@ import { ProposalDetailView } from "../components/ProposalDetailView";
 import { ProposalCompareRow } from "../components/ProposalCompareRow";
 import { Tabs } from "../components/Tabs";
 import type { TabItem } from "../components/Tabs";
+import { TrailDecoration } from "../components/TrailDecoration";
 import { Icon } from "../components/Icon";
 import { useTrips } from "../hooks/useTrips";
 import { useDestinationImage } from "../hooks/useDestinationImage";
@@ -15,11 +16,10 @@ interface ResultsLocationState {
   searchParams: SearchParams;
 }
 
-const CATEGORY_TO_TIER: Record<SearchParams["category"], TierLevel | null> = {
+const CATEGORY_TO_TIER: Record<SearchParams["category"], TierLevel> = {
   economico: "barato",
   equilibrado: "medio",
   comodo: "caro",
-  sorprendeme: null,
 };
 
 const TIER_ORDER: TierLevel[] = ["barato", "medio", "caro"];
@@ -35,7 +35,7 @@ export function ResultsScreen() {
     [state],
   );
 
-  const highlightedTier = searchResult ? CATEGORY_TO_TIER[searchResult.searchParams.category] : null;
+  const highlightedTier = searchResult ? CATEGORY_TO_TIER[searchResult.searchParams.category] : undefined;
   const [activeTab, setActiveTab] = useState<string>(highlightedTier ?? "comparativa");
   const heroImage = useDestinationImage(searchResult?.searchParams.destination ?? "");
 
@@ -64,7 +64,8 @@ export function ResultsScreen() {
     ...TIER_ORDER.map((tier) => ({
       id: tier,
       label: TIER_THEME[tier].label,
-      activeClassName: TIER_THEME[tier].tabActive,
+      activeBgClass: TIER_THEME[tier].solidBg,
+      markerColorClass: TIER_THEME[tier].accentText,
     })),
   ];
 
@@ -98,11 +99,14 @@ export function ResultsScreen() {
         </div>
       </div>
 
-      <div className="bg-white">
-        <div className="mx-auto w-full max-w-6xl px-4 py-4">
+      <div className="relative overflow-hidden bg-white">
+        <TrailDecoration side="left" />
+        <TrailDecoration side="right" />
+
+        <div className="relative mx-auto w-full max-w-6xl px-4 py-4">
           <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
 
-          <div className="mt-4 pb-8">
+          <div key={activeTab} className="animate-slide-in-trail pb-8">
             {activeTab === "comparativa" ? (
               <div className="flex flex-col gap-3">
                 {proposals.map((proposal) => (

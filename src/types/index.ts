@@ -1,6 +1,6 @@
 export type TierLevel = "barato" | "medio" | "caro";
 
-export type TripCategory = "economico" | "equilibrado" | "comodo" | "sorprendeme";
+export type TripCategory = "economico" | "equilibrado" | "comodo";
 
 export const PREFERENCES = [
   "Playa",
@@ -53,6 +53,7 @@ export interface Restaurant {
   name: string;
   description: string;
   area: string;
+  tier: TierLevel;
 }
 
 export interface ItineraryDay {
@@ -60,8 +61,10 @@ export interface ItineraryDay {
   date: string; // ISO date
   isArrivalDay: boolean;
   morning: string;
+  morningActivityId: string;
   restaurant: Restaurant;
   afternoon: string;
+  afternoonActivityId: string;
   night: string;
 }
 

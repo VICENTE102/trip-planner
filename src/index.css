@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -22,8 +22,8 @@
   --color-ink-500: #8a7a72;
   --color-ink-200: #e8dcd3;
 
-  --font-heading: "Baloo 2", "system-ui", sans-serif;
-  --font-body: "Nunito", "system-ui", sans-serif;
+  --font-heading: "Fraunces", "system-ui", serif;
+  --font-body: "Inter", "system-ui", sans-serif;
 }
 
 body {
@@ -52,4 +52,42 @@ h3 {
 
 .animate-fade-in-up {
   animation: fade-in-up 0.45s ease-out both;
+}
+
+/* Footprint "hop" that lands under a tab when it becomes active */
+@keyframes tab-hop {
+  0% {
+    transform: translate(-50%, -4px);
+    opacity: 0;
+  }
+  40% {
+    transform: translate(-50%, -9px);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(-50%, 1px);
+  }
+  100% {
+    transform: translate(-50%, 0);
+  }
+}
+
+.animate-tab-hop {
+  animation: tab-hop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Tab content sliding in like advancing along a trail */
+@keyframes slide-in-trail {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-trail {
+  animation: slide-in-trail 0.35s ease-out both;
 }

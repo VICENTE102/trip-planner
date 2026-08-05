@@ -8,6 +8,7 @@ export interface TierTheme {
   border: string;
   badge: string;
   tabActive: string;
+  accentText: string;
 }
 
 // Centralized so every screen/component uses the exact same hue per tier —
@@ -21,6 +22,7 @@ export const TIER_THEME: Record<TierLevel, TierTheme> = {
     border: "border-emerald-500",
     badge: "bg-emerald-100 text-emerald-700",
     tabActive: "border-emerald-500 text-emerald-700",
+    accentText: "text-emerald-500",
   },
   medio: {
     label: "Equilibrado",
@@ -30,6 +32,7 @@ export const TIER_THEME: Record<TierLevel, TierTheme> = {
     border: "border-indigo-500",
     badge: "bg-indigo-100 text-indigo-700",
     tabActive: "border-indigo-500 text-indigo-700",
+    accentText: "text-indigo-500",
   },
   caro: {
     label: "Cómodo",
@@ -39,5 +42,6 @@ export const TIER_THEME: Record<TierLevel, TierTheme> = {
     border: "border-amber-500",
     badge: "bg-amber-100 text-amber-700",
     tabActive: "border-amber-500 text-amber-700",
+    accentText: "text-amber-500",
   },
 };

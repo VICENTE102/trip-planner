@@ -22,11 +22,11 @@ const initialParams: SearchParams = {
   budget: 500,
   budgetType: "total",
   travelers: 1,
-  category: "sorprendeme",
+  category: "equilibrado",
   preferences: [],
 };
 
-const CATEGORY_TIER: Partial<Record<TripCategory, TierLevel>> = {
+const CATEGORY_TIER: Record<TripCategory, TierLevel> = {
   economico: "barato",
   equilibrado: "medio",
   comodo: "caro",
@@ -36,13 +36,12 @@ const CATEGORY_OPTIONS: { value: TripCategory; label: string }[] = [
   { value: "economico", label: "Económico" },
   { value: "equilibrado", label: "Equilibrado" },
   { value: "comodo", label: "Cómodo" },
-  { value: "sorprendeme", label: "Sorpréndeme" },
 ];
 
 const inputClass =
-  "rounded-2xl border border-ink-200 bg-white px-4 py-2.5 text-base text-ink-900 placeholder:text-ink-500/60 transition focus:border-lagoon-500 focus:outline-none focus:ring-2 focus:ring-lagoon-100";
-const labelClass = "text-sm font-semibold text-ink-700";
-const errorClass = "text-sm text-sunset-700";
+  "w-full border-0 border-b-2 border-white/30 bg-transparent px-0.5 py-2 text-lg text-white placeholder:text-white/40 transition focus:border-sunset-400 focus:outline-none";
+const labelClass = "font-heading text-lg font-semibold text-white";
+const errorClass = "text-sm text-rose-300";
 
 export function SearchForm({ onSubmit }: SearchFormProps) {
   const [params, setParams] = useState<SearchParams>(initialParams);
@@ -62,9 +61,9 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-7">
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "0ms" }}>
           <label htmlFor="origin" className={labelClass}>
             ¿Desde dónde sales?
           </label>
@@ -79,7 +78,7 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
           {errors.origin && <span className={errorClass}>{errors.origin}</span>}
         </div>
 
-        <div className="flex flex-col gap-1">
+        <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "60ms" }}>
           <label htmlFor="destination" className={labelClass}>
             ¿A dónde te apetece ir?
           </label>
@@ -95,8 +94,8 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "120ms" }}>
           <label htmlFor="departureDate" className={labelClass}>
             ¿Cuándo os vais?
           </label>
@@ -105,12 +104,12 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
             type="date"
             value={params.departureDate}
             onChange={(e) => updateField("departureDate", e.target.value)}
-            className={inputClass}
+            className={`${inputClass} [color-scheme:dark]`}
           />
           {errors.departureDate && <span className={errorClass}>{errors.departureDate}</span>}
         </div>
 
-        <div className="flex flex-col gap-1">
+        <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "180ms" }}>
           <label htmlFor="returnDate" className={labelClass}>
             ¿Cuándo volvéis?
           </label>
@@ -119,39 +118,50 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
             type="date"
             value={params.returnDate}
             onChange={(e) => updateField("returnDate", e.target.value)}
-            className={inputClass}
+            className={`${inputClass} [color-scheme:dark]`}
           />
           {errors.returnDate && <span className={errorClass}>{errors.returnDate}</span>}
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "240ms" }}>
           <label htmlFor="budget" className={labelClass}>
             ¿Cuál es tu presupuesto?
           </label>
-          <div className="flex gap-2">
+          <div className="flex items-end gap-3">
             <input
               id="budget"
               type="number"
               min={1}
               value={params.budget}
               onChange={(e) => updateField("budget", Number(e.target.value))}
-              className={`flex-1 ${inputClass}`}
+              className={`${inputClass} flex-1`}
             />
-            <select
-              value={params.budgetType}
-              onChange={(e) => updateField("budgetType", e.target.value as SearchParams["budgetType"])}
-              className={inputClass}
-            >
-              <option value="total">Total</option>
-              <option value="perNight">Por noche</option>
-            </select>
+            <div className="relative">
+              <select
+                value={params.budgetType}
+                onChange={(e) => updateField("budgetType", e.target.value as SearchParams["budgetType"])}
+                className={`${inputClass} appearance-none pr-5 text-base`}
+              >
+                <option className="text-ink-900" value="total">
+                  Total
+                </option>
+                <option className="text-ink-900" value="perNight">
+                  Por noche
+                </option>
+              </select>
+              <Icon
+                name="compass"
+                size={12}
+                className="pointer-events-none absolute right-0 top-3 text-white/50"
+              />
+            </div>
           </div>
           {errors.budget && <span className={errorClass}>{errors.budget}</span>}
         </div>
 
-        <div className="flex flex-col gap-1">
+        <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "300ms" }}>
           <label htmlFor="travelers" className={labelClass}>
             ¿Cuántos viajáis?
           </label>
@@ -167,15 +177,12 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="animate-fade-in-up flex flex-col gap-2" style={{ animationDelay: "360ms" }}>
         <span className={labelClass}>¿Qué tipo de viaje buscas?</span>
         <div className="flex flex-wrap gap-2">
           {CATEGORY_OPTIONS.map((option) => {
-            const tier = CATEGORY_TIER[option.value];
-            const theme = tier ? TIER_THEME[tier] : null;
+            const theme = TIER_THEME[CATEGORY_TIER[option.value]];
             const isSelected = params.category === option.value;
-            const selectedClass = theme ? theme.solidBg : "bg-sunset-500";
-            const unselectedClass = theme ? `${theme.softBg} ${theme.text}` : "bg-sunset-50 text-sunset-700";
 
             return (
               <button
@@ -183,8 +190,10 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
                 type="button"
                 onClick={() => updateField("category", option.value)}
                 aria-pressed={isSelected}
-                className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
-                  isSelected ? `${selectedClass} text-white shadow-sm` : `${unselectedClass} hover:opacity-80`
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  isSelected
+                    ? `${theme.solidBg} text-white shadow-sm`
+                    : "border border-white/30 bg-white/5 text-white/85 hover:bg-white/10"
                 }`}
               >
                 {option.label}
@@ -194,7 +203,7 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="animate-fade-in-up flex flex-col gap-2" style={{ animationDelay: "420ms" }}>
         <span className={labelClass}>¿Qué te apetece hacer?</span>
         <PreferenceChips
           selected={params.preferences}
@@ -204,7 +213,8 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
 
       <button
         type="submit"
-        className="mt-2 flex items-center justify-center gap-2 rounded-full bg-sunset-500 py-3.5 text-base font-bold text-white shadow-lg shadow-sunset-500/30 transition hover:-translate-y-0.5 hover:bg-sunset-600 hover:shadow-xl active:translate-y-0"
+        className="animate-fade-in-up mt-2 flex items-center justify-center gap-2 rounded-full bg-sunset-500 py-3.5 text-base font-bold text-white shadow-lg shadow-sunset-500/30 transition hover:-translate-y-0.5 hover:bg-sunset-600 hover:shadow-xl active:translate-y-0"
+        style={{ animationDelay: "480ms" }}
       >
         <Icon name="plane" size={18} />
         Buscar mi viaje ideal

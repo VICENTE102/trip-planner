@@ -28,6 +28,12 @@ export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalD
   const theme = TIER_THEME[tier];
   const isOverBudget = economicSummary.remaining < 0;
 
+  const sectionTabs: TabItem[] = SECTIONS.map((tab) => ({
+    ...tab,
+    activeBgClass: theme.solidBg,
+    markerColorClass: theme.accentText,
+  }));
+
   const hotelBookingUrl = getHotelLink(
     hotel.name,
     searchParams.destination,
@@ -73,11 +79,16 @@ export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalD
       </div>
 
       <div className="px-4 pt-3">
-        <Tabs tabs={SECTIONS} activeId={section} onChange={setSection} />
+        <Tabs tabs={sectionTabs} activeId={section} onChange={setSection} />
       </div>
 
-      <div className={`p-4 ${section === "itinerario" ? "" : "max-w-2xl"}`}>
-        {section === "itinerario" && <ItineraryPreview itinerary={itinerary} searchParams={searchParams} />}
+      <div
+        key={section}
+        className={`animate-slide-in-trail p-4 ${section === "itinerario" ? "" : "max-w-2xl"}`}
+      >
+        {section === "itinerario" && (
+          <ItineraryPreview itinerary={itinerary} searchParams={searchParams} tier={tier} />
+        )}
         {section === "alojamiento" && <HotelCard hotel={hotel} bookingUrl={hotelBookingUrl} />}
         {section === "vuelos" && <FlightSummary itinerary={itinerary} searchParams={searchParams} />}
         {section === "gastos" && <EconomicSummaryView summary={economicSummary} />}
