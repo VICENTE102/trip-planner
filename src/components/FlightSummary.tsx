@@ -20,7 +20,7 @@ export function FlightSummary({ itinerary, searchParams }: FlightSummaryProps) {
     destination: searchParams.destination,
     departureDate: searchParams.departureDate,
     returnDate: searchParams.returnDate,
-    travelers: searchParams.travelers,
+    travelers: searchParams.travelers + searchParams.children,
     airline: outboundFlight.airline,
   });
 

@@ -21,8 +21,8 @@ export interface SearchParams {
   departureDate: string; // ISO date (YYYY-MM-DD)
   returnDate: string; // ISO date (YYYY-MM-DD)
   budget: number;
-  budgetType: "total" | "perNight";
   travelers: number;
+  children: number;
   category: TripCategory;
   preferences: Preference[];
 }

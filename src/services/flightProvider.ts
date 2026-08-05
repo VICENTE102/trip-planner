@@ -38,9 +38,11 @@ export const mockFlightProvider: FlightProvider = {
     const outboundRandom = createSeededRandom(seed);
     const returnRandom = createSeededRandom(seed + 1000);
 
+    const totalTravelers = params.travelers + params.children;
+
     return {
-      outbound: buildFlight(outboundRandom, "out", params.departureDate, params.travelers),
-      return: buildFlight(returnRandom, "ret", params.returnDate, params.travelers),
+      outbound: buildFlight(outboundRandom, "out", params.departureDate, totalTravelers),
+      return: buildFlight(returnRandom, "ret", params.returnDate, totalTravelers),
     };
   },
 };

@@ -92,8 +92,8 @@ export function ResultsScreen() {
           </h1>
           <p className="text-white/85 lg:text-lg">
             {searchParams.origin} → {searchParams.destination} · {searchParams.departureDate} →{" "}
-            {searchParams.returnDate} · {searchParams.travelers} viajero
-            {searchParams.travelers > 1 ? "s" : ""}
+            {searchParams.returnDate} · {searchParams.travelers + searchParams.children} viajero
+            {searchParams.travelers + searchParams.children > 1 ? "s" : ""}
           </p>
           <p className="mt-1 text-lg font-semibold lg:text-xl">Propuestas desde {cheapestTotal}€</p>
         </div>

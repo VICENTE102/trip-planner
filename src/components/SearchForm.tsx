@@ -9,7 +9,7 @@ import { TravelStamp } from "./TravelStamp";
 import { TIER_THEME } from "../constants/tierTheme";
 
 interface SearchFormProps {
-  onSubmit: (params: SearchParams) => void;
+  onSubmit: (params: SearchParams) => Promise<void>;
 }
 
 const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -21,8 +21,8 @@ const initialParams: SearchParams = {
   departureDate: tomorrow,
   returnDate: nextWeek,
   budget: 500,
-  budgetType: "total",
   travelers: 1,
+  children: 0,
   category: "equilibrado",
   preferences: [],
 };
@@ -50,12 +50,14 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
   const [params, setParams] = useState<SearchParams>(initialParams);
   const [errors, setErrors] = useState<SearchFormErrors>({});
   const [isTakingOff, setIsTakingOff] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   // Raw text for the number inputs, kept separate from the numeric params.
   // Binding the input directly to a number forces `Number("")` -> 0 back
   // into the field on every keystroke, which is what glued a "0" to the
   // front while typing.
   const [budgetInput, setBudgetInput] = useState(String(initialParams.budget));
   const [travelersInput, setTravelersInput] = useState(String(initialParams.travelers));
+  const [childrenInput, setChildrenInput] = useState(String(initialParams.children));
 
   function updateField<K extends keyof SearchParams>(field: K, value: SearchParams[K]) {
     setParams((prev) => ({ ...prev, [field]: value }));
@@ -90,14 +92,41 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
     }
   }
 
-  function handleSubmit(event: FormEvent) {
+  function handleChildrenChange(raw: string) {
+    setChildrenInput(raw);
+    const parsed = Number(raw);
+    if (raw.trim() !== "" && !Number.isNaN(parsed)) {
+      updateField("children", parsed);
+    }
+  }
+
+  function handleChildrenBlur() {
+    if (childrenInput.trim() === "") {
+      setChildrenInput("0");
+      updateField("children", 0);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const validationErrors = validateSearchParams(params);
     setErrors(validationErrors);
-    if (Object.keys(validationErrors).length === 0) {
-      setIsTakingOff(true);
-      // let the takeoff animation play before navigating to results
-      setTimeout(() => onSubmit(params), 450);
+    if (Object.keys(validationErrors).length > 0) {
+      return;
+    }
+
+    setSubmitError(null);
+    setIsTakingOff(true);
+
+    // let the takeoff animation play before triggering the search
+    await new Promise((resolve) => setTimeout(resolve, 450));
+
+    try {
+      await onSubmit(params);
+      // on success the parent navigates away, so no need to reset state here
+    } catch (error) {
+      setIsTakingOff(false);
+      setSubmitError(error instanceof Error ? error.message : "No se pudo generar el viaje. Inténtalo de nuevo.");
     }
   }
 
@@ -165,48 +194,27 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
         </div>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "240ms" }}>
-          <label htmlFor="budget" className={labelClass}>
-            ¿Cuál es tu presupuesto?
-          </label>
-          <div className="flex items-end gap-3">
-            <input
-              id="budget"
-              type="number"
-              min={1}
-              placeholder="Ej. 500"
-              value={budgetInput}
-              onChange={(e) => handleBudgetChange(e.target.value)}
-              onBlur={handleBudgetBlur}
-              className={`${inputClass} flex-1`}
-            />
-            <div className="relative">
-              <select
-                value={params.budgetType}
-                onChange={(e) => updateField("budgetType", e.target.value as SearchParams["budgetType"])}
-                className={`${inputClass} appearance-none pr-5 text-base`}
-              >
-                <option className="text-ink-900" value="total">
-                  Total
-                </option>
-                <option className="text-ink-900" value="perNight">
-                  Por noche
-                </option>
-              </select>
-              <Icon
-                name="compass"
-                size={12}
-                className="pointer-events-none absolute right-0 top-3 text-white/50"
-              />
-            </div>
-          </div>
-          {errors.budget && <span className={errorClass}>{errors.budget}</span>}
-        </div>
+      <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "240ms" }}>
+        <label htmlFor="budget" className={labelClass}>
+          ¿Cuál es tu presupuesto total?
+        </label>
+        <input
+          id="budget"
+          type="number"
+          min={1}
+          placeholder="Ej. 500"
+          value={budgetInput}
+          onChange={(e) => handleBudgetChange(e.target.value)}
+          onBlur={handleBudgetBlur}
+          className={`${inputClass} max-w-xs`}
+        />
+        {errors.budget && <span className={errorClass}>{errors.budget}</span>}
+      </div>
 
+      <div className="grid gap-6 sm:grid-cols-2">
         <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "300ms" }}>
           <label htmlFor="travelers" className={labelClass}>
-            ¿Cuántos viajáis?
+            ¿Cuántos adultos viajáis?
           </label>
           <input
             id="travelers"
@@ -218,6 +226,21 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
             className={inputClass}
           />
           {errors.travelers && <span className={errorClass}>{errors.travelers}</span>}
+        </div>
+
+        <div className="animate-fade-in-up flex flex-col gap-1.5" style={{ animationDelay: "330ms" }}>
+          <label htmlFor="children" className={labelClass}>
+            ¿Cuántos menores? (opcional)
+          </label>
+          <input
+            id="children"
+            type="number"
+            min={0}
+            value={childrenInput}
+            onChange={(e) => handleChildrenChange(e.target.value)}
+            onBlur={handleChildrenBlur}
+            className={inputClass}
+          />
         </div>
       </div>
 
@@ -275,6 +298,7 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
         </span>
         <span className={isTakingOff ? "animate-fade-out" : ""}>Buscar mi viaje ideal</span>
       </button>
+      {submitError && <p className={`text-center ${errorClass}`}>{submitError}</p>}
     </form>
   );
 }

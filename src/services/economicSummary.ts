@@ -10,17 +10,16 @@ export function buildEconomicSummary(
   itinerary: Itinerary,
   tier: TierLevel,
 ): EconomicSummary {
-  const { totalDays, totalNights } = itinerary;
-  const { travelers } = params;
+  const { totalDays } = itinerary;
+  const totalTravelers = params.travelers + params.children;
 
   const accommodation = hotel.totalPrice;
-  const meals = Math.round(MEAL_COST_PER_DAY[tier] * totalDays * travelers);
-  const transport = Math.round(TRANSPORT_COST_PER_DAY[tier] * totalDays * travelers);
-  const activities = Math.round(ACTIVITIES_COST_PER_DAY[tier] * totalDays * travelers);
+  const meals = Math.round(MEAL_COST_PER_DAY[tier] * totalDays * totalTravelers);
+  const transport = Math.round(TRANSPORT_COST_PER_DAY[tier] * totalDays * totalTravelers);
+  const activities = Math.round(ACTIVITIES_COST_PER_DAY[tier] * totalDays * totalTravelers);
   const total = accommodation + meals + transport + activities;
 
-  const budgetReference =
-    params.budgetType === "total" ? params.budget : params.budget * totalNights;
+  const budgetReference = params.budget;
 
   return {
     accommodation,

@@ -26,8 +26,7 @@ function randomInRange(random: () => number, [min, max]: [number, number]): numb
 
 export const mockHotelProvider: HotelProvider = {
   getHotels(params, nights) {
-    const perNightBudget =
-      params.budgetType === "total" ? params.budget / nights : params.budget;
+    const perNightBudget = params.budget / nights;
 
     const seed = hashString(`${params.destination}-${params.departureDate}-${params.budget}`);
 

@@ -39,7 +39,7 @@ export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalD
     searchParams.destination,
     searchParams.departureDate,
     searchParams.returnDate,
-    searchParams.travelers,
+    searchParams.travelers + searchParams.children,
   );
 
   return (

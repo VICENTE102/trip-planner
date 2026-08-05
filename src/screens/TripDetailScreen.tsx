@@ -30,8 +30,8 @@ export function TripDetailScreen() {
         </h1>
         <p className="text-sm text-ink-500">
           {searchParams.origin} → {searchParams.destination} · {searchParams.departureDate} →{" "}
-          {searchParams.returnDate} · {searchParams.travelers} viajero
-          {searchParams.travelers > 1 ? "s" : ""}
+          {searchParams.returnDate} · {searchParams.travelers + searchParams.children} viajero
+          {searchParams.travelers + searchParams.children > 1 ? "s" : ""}
         </p>
       </div>
 

@@ -3,11 +3,20 @@ import { SearchForm } from "../components/SearchForm";
 import { WorldCollage } from "../components/WorldCollage";
 import { Icon } from "../components/Icon";
 import type { SearchParams } from "../types";
+import { formatTripApiError, generateTrip } from "../services/trip-api.client";
+
+const GENERATION_STORAGE_KEY = "tripplanner:lastGeneration";
 
 export function SearchScreen() {
   const navigate = useNavigate();
 
-  function handleSubmit(params: SearchParams) {
+  async function handleSubmit(params: SearchParams) {
+    try {
+      const generation = await generateTrip(params);
+      sessionStorage.setItem(GENERATION_STORAGE_KEY, JSON.stringify(generation));
+    } catch (error) {
+      throw new Error(formatTripApiError(error));
+    }
     navigate("/results", { state: { searchParams: params } });
   }
 
