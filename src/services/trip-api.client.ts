@@ -26,10 +26,43 @@ interface TripRequest {
 
 type ProposalType = "economical" | "recommended" | "comfort";
 
-interface MockProposal {
+interface ScoreBreakdown {
+  price: number;
+  accommodationQuality: number;
+  location: number;
+  transportComfort: number;
+  usableTime: number;
+  preferenceMatch: number;
+}
+
+interface BudgetBreakdown {
+  mainTransportCost: number;
+  accommodationCost: number;
+  foodBudget: number;
+  activityCost: number;
+  localTransportCost: number;
+  insuranceCost: number;
+  emergencyReserve: number;
+  totalTripCost: number;
+}
+
+// flight/accommodation/itinerary se dejan sin tipar en detalle: el
+// frontend todavía no renderiza estos datos (siguen viniendo de
+// searchService.ts, ver Fase 4), solo los guarda en sessionStorage. Se
+// tipará en profundidad cuando /results empiece a consumirlos de verdad.
+export interface TripProposal {
   type: ProposalType;
   score: number;
-  estimatedTotal: number;
+  rank: number;
+  scoreBreakdown: ScoreBreakdown;
+  flight: Record<string, unknown>;
+  accommodation: Record<string, unknown>;
+  itinerary: unknown[];
+  budget: BudgetBreakdown;
+  totalCost: number;
+  costPerPerson: number;
+  evaluatedCombinations: number;
+  discardedCombinations: number;
   reasons: string[];
   warnings: string[];
 }
@@ -39,7 +72,7 @@ export interface GenerateTripResponse {
   status: string;
   request: Record<string, unknown>;
   metadata: { evaluatedCombinations: number; discardedCombinations: number };
-  proposals: MockProposal[];
+  proposals: TripProposal[];
 }
 
 interface TripApiErrorIssue {

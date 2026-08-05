@@ -1,29 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { tripRequestSchema } from "../../server/schemas/trip.schema.js";
+import { generateTripProposals } from "../../server/services/trip-planner.service.js";
 
-type ProposalType = "economical" | "recommended" | "comfort";
-
-interface MockProposal {
-  type: ProposalType;
-  score: number;
-  estimatedTotal: number;
-  reasons: string[];
-  warnings: string[];
-}
-
-const PROPOSAL_TYPES: ProposalType[] = ["economical", "recommended", "comfort"];
-
-function buildMockProposals(): MockProposal[] {
-  return PROPOSAL_TYPES.map((type) => ({
-    type,
-    score: 0,
-    estimatedTotal: 0,
-    reasons: [],
-    warnings: [],
-  }));
-}
-
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = crypto.randomUUID();
 
   if (req.method !== "POST") {
@@ -51,19 +30,28 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { departureDate, returnDate, ...rest } = parsed.data;
+  const requestSummary = {
+    ...rest,
+    departureDate: departureDate.toISOString().slice(0, 10),
+    returnDate: returnDate.toISOString().slice(0, 10),
+  };
 
-  return res.status(201).json({
-    id: requestId,
-    status: "generated",
-    request: {
-      ...rest,
-      departureDate: departureDate.toISOString().slice(0, 10),
-      returnDate: returnDate.toISOString().slice(0, 10),
-    },
-    metadata: {
-      evaluatedCombinations: 0,
-      discardedCombinations: 0,
-    },
-    proposals: buildMockProposals(),
-  });
+  try {
+    const { proposals, evaluatedCombinations, discardedCombinations } = await generateTripProposals(parsed.data);
+
+    return res.status(201).json({
+      id: requestId,
+      status: "generated",
+      request: requestSummary,
+      metadata: { evaluatedCombinations, discardedCombinations },
+      proposals,
+    });
+  } catch (error) {
+    // Sección 16.3: mensaje seguro al usuario, detalle técnico solo en logs.
+    console.error(`[${requestId}] Error generando propuestas de viaje`, error);
+    return res.status(500).json({
+      error: { code: "INTERNAL_ERROR", message: "No se pudo generar el viaje. Inténtalo de nuevo." },
+      requestId,
+    });
+  }
 }
