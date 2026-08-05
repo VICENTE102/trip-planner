@@ -64,16 +64,35 @@ function buildOpeningHours(random: () => number): OpeningPeriod[] {
   return days.map((dayOfWeek) => ({ dayOfWeek, opensAt, closesAt }));
 }
 
+// Garantiza al menos una instancia de cada plantilla (16 en total, 2 por
+// cada una de las 8 temáticas/preferencias) antes de rellenar el resto de
+// huecos con plantillas aleatorias para dar variedad. Con muestreo
+// aleatorio puro, algunos destinos podían quedarse sin ninguna actividad
+// de una categoría concreta (p. ej. "compras"), lo que rompe en la
+// práctica la regla de la sección 6.1/Fase 9 de dar más peso a esa
+// temática cuando el usuario la pide, aunque el ranking por afinidad en sí
+// fuera correcto: no hay nada que ordenar arriba si no se generó ninguna
+// actividad de esa categoría.
+function buildTemplateSequence(count: number, seed: number): ActivityTemplate[] {
+  const extraSlots = Math.max(0, count - ACTIVITY_TEMPLATES.length);
+  const extras = Array.from({ length: extraSlots }, (_, index) => {
+    const random = createSeededRandom(seed + 9973 + index);
+    return pick(ACTIVITY_TEMPLATES, random);
+  });
+  return [...ACTIVITY_TEMPLATES, ...extras];
+}
+
 export function generateMockActivities(request: ActivitySearchRequest): ActivityCandidate[] {
   const seed = hashString(`activities-${request.destination}`);
   const countRandom = createSeededRandom(seed);
   const count = MIN_ACTIVITIES + Math.floor(countRandom() * (MAX_ACTIVITIES - MIN_ACTIVITIES + 1));
   const center = fakeCityCenter(request.destination);
+  const templateSequence = buildTemplateSequence(count, seed);
 
   const activities: ActivityCandidate[] = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < templateSequence.length; i++) {
     const random = createSeededRandom(seed + i * 211 + 1);
-    const template = pick(ACTIVITY_TEMPLATES, random);
+    const template = templateSequence[i];
     const [minDuration, maxDuration] = template.durationRange;
     const [minPrice, maxPrice] = template.priceRange;
     const coordinates = jitterCoordinates(center, random, 0.15);

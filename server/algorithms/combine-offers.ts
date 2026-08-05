@@ -1,12 +1,43 @@
 import type { AccommodationOffer } from "../types/accommodation.js";
 import type { ActivityCandidate } from "../types/activity.js";
 import type { FlightOffer } from "../types/flight.js";
-import type { PreferenceLevel, PreferenceProfile, ScoreBreakdown, TravelPreference, TripCombination } from "../types/trip.js";
+import type {
+  BudgetBreakdown,
+  PreferenceLevel,
+  PreferenceProfile,
+  ScoreBreakdown,
+  TravelPreference,
+  TripCombination,
+} from "../types/trip.js";
 import { allocateBudget } from "./allocate-budget.js";
 import { normalizeScore } from "./normalize-score.js";
 import { calculatePreferenceScore } from "./score-preferences.js";
 import { scoreAccommodation } from "./score-accommodation.js";
 import { scoreFlight } from "./score-flight.js";
+
+// Fase 9 (sección 6.1): cómo influyen las preferencias en el plan, con lo
+// que ya es honesto implementar sin un itinerario real todavía.
+//
+// - Gastronomía alta -> más presupuesto de comidas: implementado abajo
+//   (applyGastronomyBudgetBoost), ajusta foodBudget tras allocateBudget().
+// - Cultura/Naturaleza/Compras/Playa altas -> más peso a las actividades
+//   de esa temática (museos/patrimonio, parques/excursiones, mercados,
+//   actividades acuáticas): ya lo hace selectTopActivities() de más abajo,
+//   ordenando por calculatePreferenceScore() contra el profile de cada
+//   ActivityCandidate — los templates de la Fase 5 ya codifican esas
+//   mismas asociaciones temáticas. Se deja documentado aquí para que la
+//   conexión con la sección 6.1 sea explícita, no implícita.
+// - Partes de esas mismas preferencias que SÍ requieren un itinerario real
+//   quedan pendientes de la Fase 10: "hoteles cercanos al litoral" y "días
+//   de descanso" (playa), "mayor peso de accesibilidad a monumentos"
+//   (cultura), "menor concentración urbana" (naturaleza) y "tiempo
+//   reservado" (compras) son todo señales de ritmo/logística de
+//   itinerario, no de selección de actividades.
+// - Familia alta, Relax alto y Vida nocturna alta son en su totalidad
+//   reglas de ritmo/horario del itinerario (menos traslados, máx. 2
+//   visitas, comienzo/final más tarde...) — no se implementan todavía por
+//   la misma razón, no hay ItineraryDay/ItineraryItem con el que
+//   trabajar. Se retoman en la Fase 10.
 
 export interface CombineOffersContext {
   travelers: number;
@@ -22,10 +53,18 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+// Sección 6.1 (Fase 9): "cultura alta -> mayor peso de patrimonio y
+// museos", "naturaleza alta -> excursiones, parques y zonas verdes",
+// "compras alta -> mercados y zonas comerciales", "playa alta -> favorecer
+// litoral y actividades acuáticas". Ordenar por calculatePreferenceScore()
+// aplica las cuatro reglas a la vez: una actividad de categoría "playa"
+// solo sube en el ranking si el usuario puso beach > 0, y sube más cuanto
+// mayor sea ese nivel — exactamente el efecto que pide la sección 6.1.
+//
 // No hay todavía un planificador de itinerario real (Fase 10): mientras
-// tanto, cada combinación se queda con las actividades más afines a las
-// preferencias del usuario (aprox. 2 por día), suficientes para estimar
-// activityCost y la afinidad de preferencias de la combinación.
+// tanto, cada combinación se queda con las actividades más afines (aprox.
+// 2 por día), suficientes para estimar activityCost y la afinidad de
+// preferencias de la combinación.
 function selectTopActivities(
   activities: ActivityCandidate[],
   preferences: PreferenceProfile,
@@ -37,9 +76,34 @@ function selectTopActivities(
     .slice(0, count);
 }
 
+// Sección 6.1: "gastronomía alta -> reservar mayor presupuesto de
+// comidas". El documento no da una fórmula exacta; se aplica un recargo
+// orientativo sobre el foodBudget ya calculado por allocateBudget(),
+// proporcional al nivel de preferencia (0-3), y se recalcula
+// totalTripCost en consecuencia. Con nivel 0 o 1 no se toca nada.
+const GASTRONOMY_FOOD_BUDGET_BOOST: Record<PreferenceLevel, number> = {
+  0: 0,
+  1: 0,
+  2: 0.2,
+  3: 0.4,
+};
+
+export function applyGastronomyBudgetBoost(budget: BudgetBreakdown, preferences: PreferenceProfile): BudgetBreakdown {
+  const boost = GASTRONOMY_FOOD_BUDGET_BOOST[preferences.gastronomy];
+  if (boost === 0) {
+    return budget;
+  }
+
+  const foodBudget = round2(budget.foodBudget * (1 + boost));
+  const totalTripCost = round2(budget.totalTripCost - budget.foodBudget + foodBudget);
+
+  return { ...budget, foodBudget, totalTripCost };
+}
+
 // Sección 21 (Fase 8), pasos 1-3: combina vuelos y alojamientos, calcula
 // el coste base y reserva comidas/transporte local/actividades/imprevistos
-// vía allocateBudget() (Fase 6) para cada combinación resultante.
+// vía allocateBudget() (Fase 6) para cada combinación resultante, ya
+// ajustado por preferencias (Fase 9).
 export function combineOffers(
   flights: FlightOffer[],
   accommodations: AccommodationOffer[],
@@ -54,7 +118,7 @@ export function combineOffers(
   const combinations: TripCombination[] = [];
   for (const flight of flights) {
     for (const accommodation of accommodations) {
-      const budget = allocateBudget({
+      const baseBudget = allocateBudget({
         userBudget: context.userBudget,
         travelers: context.travelers,
         days: context.days,
@@ -62,6 +126,7 @@ export function combineOffers(
         accommodationCost: accommodation.totalPrice,
         activityCost,
       });
+      const budget = applyGastronomyBudgetBoost(baseBudget, context.preferences);
 
       combinations.push({
         id: `combo-${flight.id}-${accommodation.id}`,
