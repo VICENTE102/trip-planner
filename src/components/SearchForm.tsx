@@ -50,9 +50,44 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
   const [params, setParams] = useState<SearchParams>(initialParams);
   const [errors, setErrors] = useState<SearchFormErrors>({});
   const [isTakingOff, setIsTakingOff] = useState(false);
+  // Raw text for the number inputs, kept separate from the numeric params.
+  // Binding the input directly to a number forces `Number("")` -> 0 back
+  // into the field on every keystroke, which is what glued a "0" to the
+  // front while typing.
+  const [budgetInput, setBudgetInput] = useState(String(initialParams.budget));
+  const [travelersInput, setTravelersInput] = useState(String(initialParams.travelers));
 
   function updateField<K extends keyof SearchParams>(field: K, value: SearchParams[K]) {
     setParams((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleBudgetChange(raw: string) {
+    setBudgetInput(raw);
+    const parsed = Number(raw);
+    if (raw.trim() !== "" && !Number.isNaN(parsed)) {
+      updateField("budget", parsed);
+    }
+  }
+
+  function handleBudgetBlur() {
+    if (budgetInput.trim() === "") {
+      updateField("budget", 0);
+    }
+  }
+
+  function handleTravelersChange(raw: string) {
+    setTravelersInput(raw);
+    const parsed = Number(raw);
+    if (raw.trim() !== "" && !Number.isNaN(parsed)) {
+      updateField("travelers", parsed);
+    }
+  }
+
+  function handleTravelersBlur() {
+    if (travelersInput.trim() === "") {
+      setTravelersInput("1");
+      updateField("travelers", 1);
+    }
   }
 
   function handleSubmit(event: FormEvent) {
@@ -140,8 +175,10 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
               id="budget"
               type="number"
               min={1}
-              value={params.budget}
-              onChange={(e) => updateField("budget", Number(e.target.value))}
+              placeholder="Ej. 500"
+              value={budgetInput}
+              onChange={(e) => handleBudgetChange(e.target.value)}
+              onBlur={handleBudgetBlur}
               className={`${inputClass} flex-1`}
             />
             <div className="relative">
@@ -175,8 +212,9 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
             id="travelers"
             type="number"
             min={1}
-            value={params.travelers}
-            onChange={(e) => updateField("travelers", Number(e.target.value))}
+            value={travelersInput}
+            onChange={(e) => handleTravelersChange(e.target.value)}
+            onBlur={handleTravelersBlur}
             className={inputClass}
           />
           {errors.travelers && <span className={errorClass}>{errors.travelers}</span>}
