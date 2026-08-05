@@ -94,7 +94,10 @@ export function generateMockFlights(request: FlightSearchRequest): FlightOffer[]
       currency: "EUR",
       outbound,
       inbound,
-      totalDurationMinutes: totalDurationMinutes(outbound),
+      // Duración total de ida y vuelta (no solo la ida): es la que necesita
+      // el motor de puntuación para comparar "aprovechamiento del tiempo"
+      // entre vuelos (sección 10.2/11.2, Fase 7).
+      totalDurationMinutes: totalDurationMinutes(outbound) + totalDurationMinutes(inbound),
       stops,
       baggageIncluded: random() > 0.4,
       refundable: random() > 0.75,

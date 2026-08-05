@@ -5,6 +5,23 @@ import { fakeCityCenter, jitterCoordinates } from "../utils/geo.js";
 const NAME_PREFIXES = ["Hotel", "Suites", "Residencia", "Posada", "Hostal", "Apartamentos"];
 const NAME_SUFFIXES = ["Central", "Plaza", "Mirador", "del Puerto", "Real", "Boutique", "Jardín", "Estación"];
 
+const AVAILABLE_AMENITIES = [
+  "Wifi gratis",
+  "Aire acondicionado",
+  "Piscina",
+  "Spa",
+  "Gimnasio",
+  "Parking",
+  "Restaurante",
+  "Vistas panorámicas",
+];
+
+function pickAmenities(random: () => number): string[] {
+  const count = 1 + Math.floor(random() * AVAILABLE_AMENITIES.length);
+  const shuffled = [...AVAILABLE_AMENITIES].sort(() => random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
 const MIN_OFFERS = 15;
 const MAX_OFFERS = 20;
 
@@ -40,6 +57,7 @@ export function generateMockAccommodations(request: AccommodationSearchRequest):
       distanceToCenterKm: Math.round(random() * 6 * 10) / 10,
       breakfastIncluded: random() > 0.5,
       freeCancellation: random() > 0.4,
+      amenities: pickAmenities(random),
       capacity: travelers + Math.floor(random() * 3),
       fetchedAt: new Date().toISOString(),
     });

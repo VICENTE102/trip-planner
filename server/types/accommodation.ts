@@ -11,6 +11,7 @@ export interface AccommodationOffer {
   distanceToCenterKm?: number;
   breakfastIncluded?: boolean;
   freeCancellation?: boolean;
+  amenities: string[];
   capacity: number;
   bookingUrl?: string;
   fetchedAt: string;
