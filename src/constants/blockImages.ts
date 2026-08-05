@@ -12,6 +12,8 @@ export const ACTIVITY_IMAGES: Record<string, string> = {
   relax: "https://upload.wikimedia.org/wikipedia/commons/9/9c/Massage_Frankfurt.jpg",
   familia: "https://upload.wikimedia.org/wikipedia/commons/9/97/Houston_Zoo_entrance.jpg",
   gastronomia: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Wine_sampling.jpg",
+  "vida-nocturna":
+    "https://upload.wikimedia.org/wikipedia/commons/5/51/Monkey_Bar%2C_the_rooftop_bar_at_25hours_Hotel_Bikini_Berlin.jpg",
   llegada: "https://upload.wikimedia.org/wikipedia/commons/9/9d/LSZH_001.jpg",
   orientacion: "https://upload.wikimedia.org/wikipedia/commons/2/26/Ximending_rainbow_crossing_201910.jpg",
 };
