@@ -1,3 +1,4 @@
+import type { ItineraryDay } from "../types/itinerary.js";
 import type {
   PreferenceProfile,
   ProposalType,
@@ -19,6 +20,15 @@ export interface SelectProposalsContext {
   preferences: PreferenceProfile;
   evaluatedCombinations: number;
   discardedCombinations: number;
+  // Fase 10: construir el itinerario (clustering + reglas de horario) es
+  // responsabilidad de otro módulo (server/algorithms/schedule-itinerary.ts
+  // + cluster-places.ts), orquestado por trip-planner.service.ts. Aquí
+  // solo se necesita el resultado para la combinación ganadora — se recibe
+  // como función en vez de importar esos módulos directamente, para no
+  // acoplar "elegir la mejor combinación" con "cómo se construye su
+  // itinerario". Solo se llama 3 veces (una por propuesta final), nunca
+  // sobre las 270 combinaciones candidatas.
+  buildItinerary: (combination: TripCombination) => ItineraryDay[];
 }
 
 // Sección 10.6: cada perfil pondera los mismos 6 criterios de forma
@@ -155,7 +165,7 @@ function buildProposal(type: ProposalType, scored: ScoredCombination, context: S
     scoreBreakdown,
     flight: combination.flight,
     accommodation: combination.accommodation,
-    itinerary: [], // Fase 10
+    itinerary: context.buildItinerary(combination),
     budget: combination.budget,
     totalCost: combination.budget.totalTripCost,
     costPerPerson: round2(combination.budget.totalTripCost / context.travelers),

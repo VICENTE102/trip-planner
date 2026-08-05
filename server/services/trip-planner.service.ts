@@ -1,12 +1,15 @@
 import type { ValidatedTripRequest } from "../schemas/trip.schema.js";
-import type { PreferenceProfile, TripProposal } from "../types/trip.js";
+import type { ItineraryDay } from "../types/itinerary.js";
+import type { PreferenceProfile, TripCombination, TripProposal } from "../types/trip.js";
 import { mockFlightProvider } from "../providers/mock-flight.provider.js";
 import { mockAccommodationProvider } from "../providers/mock-accommodation.provider.js";
 import { mockPlacesProvider } from "../providers/mock-places.provider.js";
 import { buildScoreBreakdown, combineOffers } from "../algorithms/combine-offers.js";
-import { passesQualityThresholds, validateCombination } from "../algorithms/validate-trip.js";
+import { passesQualityThresholds, validateCombination, validateItinerary, repairInvalidItinerary } from "../algorithms/validate-trip.js";
 import { filterDominatedOptions } from "../algorithms/pareto-filter.js";
 import { selectDiverseProposals } from "../algorithms/select-proposals.js";
+import { buildTravelMatrixLookup, calculateTravelMatrix } from "../algorithms/cluster-places.js";
+import { distributePlacesAcrossDays, scheduleDayActivities } from "../algorithms/schedule-itinerary.js";
 
 export interface GenerateTripResult {
   proposals: TripProposal[];
@@ -24,6 +27,67 @@ function tripDays(departureDate: Date, returnDate: Date): number {
 
 function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function addDaysIso(dateIso: string, daysToAdd: number): string {
+  const date = new Date(`${dateIso}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + daysToAdd);
+  return toIsoDate(date);
+}
+
+// Construye el itinerario real (Fase 10) de una combinación ganadora:
+// matriz de desplazamientos (hotel + actividades elegidas) -> agrupación
+// por proximidad y reparto entre días -> horario día a día -> validación y
+// reparación si hace falta. Solo se llama sobre las 3 combinaciones que
+// selectDiverseProposals() elige al final, nunca sobre las decenas o
+// cientos de candidatas evaluadas.
+function buildItineraryForCombination(
+  combination: TripCombination,
+  context: { days: number; departureDateIso: string; preferences: PreferenceProfile },
+): ItineraryDay[] {
+  const hotel = {
+    id: combination.accommodation.id,
+    name: combination.accommodation.name,
+    latitude: combination.accommodation.latitude,
+    longitude: combination.accommodation.longitude,
+  };
+
+  const places = [
+    hotel,
+    ...combination.activities.map((activity) => ({
+      id: activity.id,
+      latitude: activity.latitude,
+      longitude: activity.longitude,
+    })),
+  ];
+  const travelLookup = buildTravelMatrixLookup(calculateTravelMatrix(places));
+  const travelMinutes = (fromId: string, toId: string) => travelLookup.get(`${fromId}->${toId}`)?.travelMinutes ?? 0;
+
+  const allocations = distributePlacesAcrossDays(combination.activities, context.days, context.preferences);
+  const outboundArrival = combination.flight.outbound[combination.flight.outbound.length - 1].arrivalTime;
+  const inboundDeparture = combination.flight.inbound?.[0]?.departureTime;
+
+  const days = allocations.map((allocation) => {
+    const date = addDaysIso(context.departureDateIso, allocation.dayNumber - 1);
+    const isArrivalDay = allocation.dayNumber === 1;
+    const isDepartureDay = allocation.dayNumber === context.days;
+
+    return scheduleDayActivities(allocation.places, {
+      dayNumber: allocation.dayNumber,
+      date,
+      dayOfWeek: new Date(`${date}T00:00:00.000Z`).getUTCDay(),
+      isArrivalDay,
+      isDepartureDay,
+      arrivalTime: isArrivalDay ? outboundArrival : undefined,
+      departureTime: isDepartureDay ? inboundDeparture : undefined,
+      preferences: context.preferences,
+      travelMinutes,
+      hotel,
+    });
+  });
+
+  const errors = validateItinerary(days);
+  return errors.length > 0 ? repairInvalidItinerary(days, errors) : days;
 }
 
 // Coordina Fases 5-8: pide ofertas simuladas a los tres proveedores mock,
@@ -97,6 +161,7 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     preferences,
     evaluatedCombinations: combinations.length,
     discardedCombinations,
+    buildItinerary: (combination) => buildItineraryForCombination(combination, { days, departureDateIso, preferences }),
   });
 
   return { proposals, evaluatedCombinations: combinations.length, discardedCombinations };

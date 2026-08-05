@@ -1,6 +1,8 @@
+import type { ItineraryDay, ItineraryItem } from "../types/itinerary.js";
 import type { ScoreBreakdown, TripCombination, ValidationError } from "../types/trip.js";
 import { isWithinBudget } from "./allocate-budget.js";
 import { meetsMinimumScores } from "./calculate-trip-score.js";
+import { isoMinutesOfDay, MAX_VISITS_PER_DAY, MIN_FREE_TIME_MINUTES_PER_DAY, minutesToIso } from "./schedule-itinerary.js";
 
 export interface ValidateCombinationContext {
   userBudget: number;
@@ -77,4 +79,135 @@ export function validateCombination(
 // por debajo de su umbral mínimo, aunque la media global sea buena.
 export function passesQualityThresholds(scoreBreakdown: ScoreBreakdown): boolean {
   return meetsMinimumScores(scoreBreakdown).passes;
+}
+
+// detectOverlaps() (Fase 10, sección 12.3): por construcción,
+// scheduleDayActivities() ya avanza el cursor de forma estrictamente
+// secuencial, así que no debería producir solapamientos — esta función es
+// la red de seguridad post-hoc que exige el documento, independiente de
+// cómo se haya construido el día.
+export function detectOverlaps(items: ItineraryItem[]): Array<[ItineraryItem, ItineraryItem]> {
+  const sorted = [...items].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  const overlaps: Array<[ItineraryItem, ItineraryItem]> = [];
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i];
+    const next = sorted[i + 1];
+    if (new Date(current.endTime).getTime() > new Date(next.startTime).getTime()) {
+      overlaps.push([current, next]);
+    }
+  }
+
+  return overlaps;
+}
+
+function dayPath(dayNumber: number): string {
+  return `itinerary.day${dayNumber}`;
+}
+
+// validateItinerary() (sección 12.3): comprueba las reglas de la sección
+// 12.1 que aplican al itinerario ya construido — solapamientos, tiempo
+// libre mínimo y máximo de visitas por día. Los horarios de apertura y el
+// límite de 3 horas continuas ya se aplican durante la construcción
+// (scheduleDayActivities), así que no hace falta re-derivarlos aquí.
+export function validateItinerary(days: ItineraryDay[]): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  for (const day of days) {
+    for (const [a, b] of detectOverlaps(day.items)) {
+      errors.push({
+        code: "ITINERARY_OVERLAP",
+        message: `"${a.title}" y "${b.title}" se solapan en el día ${day.dayNumber}.`,
+        path: dayPath(day.dayNumber),
+      });
+    }
+
+    const freeTimeMinutes = day.items
+      .filter((item) => item.type === "free_time")
+      .reduce((sum, item) => sum + item.durationMinutes, 0);
+    if (freeTimeMinutes < MIN_FREE_TIME_MINUTES_PER_DAY) {
+      errors.push({
+        code: "INSUFFICIENT_FREE_TIME",
+        message: `El día ${day.dayNumber} no llega al mínimo de ${MIN_FREE_TIME_MINUTES_PER_DAY} minutos de tiempo libre.`,
+        path: dayPath(day.dayNumber),
+      });
+    }
+
+    const visitCount = day.items.filter((item) => item.type === "visit").length;
+    if (visitCount > MAX_VISITS_PER_DAY) {
+      errors.push({
+        code: "TOO_MANY_VISITS",
+        message: `El día ${day.dayNumber} programa más de ${MAX_VISITS_PER_DAY} visitas principales.`,
+        path: dayPath(day.dayNumber),
+      });
+    }
+  }
+
+  return errors;
+}
+
+function repairOverlaps(items: ItineraryItem[], date: string): ItineraryItem[] {
+  const sorted = [...items].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+  for (let i = 1; i < sorted.length; i++) {
+    const previous = sorted[i - 1];
+    const current = sorted[i];
+    if (new Date(current.startTime).getTime() < new Date(previous.endTime).getTime()) {
+      const shiftedStart = isoMinutesOfDay(previous.endTime);
+      sorted[i] = {
+        ...current,
+        startTime: minutesToIso(date, shiftedStart),
+        endTime: minutesToIso(date, shiftedStart + current.durationMinutes),
+      };
+    }
+  }
+
+  return sorted;
+}
+
+// repairInvalidItinerary() (sección 12.3): repara lo que honestamente se
+// puede reparar de forma automática y determinista — desplazar elementos
+// solapados y añadir el tiempo libre que falte. No intenta "inventar" una
+// visita nueva ni recolocar una actividad entera fuera de su cluster de
+// proximidad; eso reabriría decisiones que ya tomaron
+// distributePlacesAcrossDays()/scheduleDayActivities().
+export function repairInvalidItinerary(days: ItineraryDay[], errors: ValidationError[]): ItineraryDay[] {
+  return days.map((day) => {
+    const dayErrors = errors.filter((error) => error.path === dayPath(day.dayNumber));
+    if (dayErrors.length === 0) {
+      return day;
+    }
+
+    let items = day.items;
+
+    if (dayErrors.some((error) => error.code === "ITINERARY_OVERLAP")) {
+      items = repairOverlaps(items, day.date);
+    }
+
+    if (dayErrors.some((error) => error.code === "INSUFFICIENT_FREE_TIME")) {
+      const freeTimeMinutes = items
+        .filter((item) => item.type === "free_time")
+        .reduce((sum, item) => sum + item.durationMinutes, 0);
+      const missing = MIN_FREE_TIME_MINUTES_PER_DAY - freeTimeMinutes;
+
+      if (missing > 0) {
+        const lastItem = items[items.length - 1];
+        const startMinutes = lastItem ? isoMinutesOfDay(lastItem.endTime) : 0;
+        items = [
+          ...items,
+          {
+            id: `item-${day.dayNumber}-repair-free-time`,
+            type: "free_time",
+            title: "Tiempo libre",
+            durationMinutes: missing,
+            startTime: minutesToIso(day.date, startMinutes),
+            endTime: minutesToIso(day.date, startMinutes + missing),
+            verificationStatus: "unverified",
+          },
+        ];
+      }
+    }
+
+    return { ...day, items };
+  });
 }
