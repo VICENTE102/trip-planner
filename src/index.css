@@ -39,6 +39,20 @@ h3 {
   font-family: var(--font-heading);
 }
 
+/* Chromium forces a solid autofill background no normal CSS can override —
+   this is the standard workaround: an absurdly slow background transition
+   plus overriding the text color it also forces. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+input:autofill {
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+  box-shadow: 0 0 0 1000px transparent inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -90,4 +104,50 @@ h3 {
 
 .animate-slide-in-trail {
   animation: slide-in-trail 0.35s ease-out both;
+}
+
+/* Luggage tag swinging then settling flat when "stamped" (selected) */
+@keyframes tag-swing {
+  0% {
+    transform: rotate(-10deg) translateY(-2px);
+  }
+  55% {
+    transform: rotate(5deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-tag-swing {
+  animation: tag-swing 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Plane accelerating off the edge of the "Buscar" button on submit */
+@keyframes plane-takeoff {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(26px, -10px) rotate(14deg);
+    opacity: 0;
+  }
+}
+
+.animate-plane-takeoff {
+  animation: plane-takeoff 0.45s ease-in forwards;
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.animate-fade-out {
+  animation: fade-out 0.3s ease-out forwards;
 }

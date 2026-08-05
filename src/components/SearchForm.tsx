@@ -5,6 +5,7 @@ import { validateSearchParams } from "../utils/validation";
 import type { SearchFormErrors } from "../utils/validation";
 import { PreferenceChips } from "./PreferenceChips";
 import { Icon } from "./Icon";
+import { TravelStamp } from "./TravelStamp";
 import { TIER_THEME } from "../constants/tierTheme";
 
 interface SearchFormProps {
@@ -38,6 +39,8 @@ const CATEGORY_OPTIONS: { value: TripCategory; label: string }[] = [
   { value: "comodo", label: "Cómodo" },
 ];
 
+const CATEGORY_TILT_CLASSES = ["-rotate-2", "rotate-2", "-rotate-1"];
+
 const inputClass =
   "w-full border-0 border-b-2 border-white/30 bg-transparent px-0.5 py-2 text-lg text-white placeholder:text-white/40 transition focus:border-sunset-400 focus:outline-none";
 const labelClass = "font-heading text-lg font-semibold text-white";
@@ -46,6 +49,7 @@ const errorClass = "text-sm text-rose-300";
 export function SearchForm({ onSubmit }: SearchFormProps) {
   const [params, setParams] = useState<SearchParams>(initialParams);
   const [errors, setErrors] = useState<SearchFormErrors>({});
+  const [isTakingOff, setIsTakingOff] = useState(false);
 
   function updateField<K extends keyof SearchParams>(field: K, value: SearchParams[K]) {
     setParams((prev) => ({ ...prev, [field]: value }));
@@ -56,7 +60,9 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
     const validationErrors = validateSearchParams(params);
     setErrors(validationErrors);
     if (Object.keys(validationErrors).length === 0) {
-      onSubmit(params);
+      setIsTakingOff(true);
+      // let the takeoff animation play before navigating to results
+      setTimeout(() => onSubmit(params), 450);
     }
   }
 
@@ -179,25 +185,22 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
 
       <div className="animate-fade-in-up flex flex-col gap-2" style={{ animationDelay: "360ms" }}>
         <span className={labelClass}>¿Qué tipo de viaje buscas?</span>
-        <div className="flex flex-wrap gap-2">
-          {CATEGORY_OPTIONS.map((option) => {
+        <div className="flex flex-wrap gap-3">
+          {CATEGORY_OPTIONS.map((option, index) => {
             const theme = TIER_THEME[CATEGORY_TIER[option.value]];
             const isSelected = params.category === option.value;
 
             return (
-              <button
+              <TravelStamp
                 key={option.value}
-                type="button"
+                label={option.label}
+                icon="plane"
+                isSelected={isSelected}
                 onClick={() => updateField("category", option.value)}
-                aria-pressed={isSelected}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  isSelected
-                    ? `${theme.solidBg} text-white shadow-sm`
-                    : "border border-white/30 bg-white/5 text-white/85 hover:bg-white/10"
-                }`}
-              >
-                {option.label}
-              </button>
+                solidBgClass={theme.solidBg}
+                stripeClass={theme.border}
+                tiltClass={CATEGORY_TILT_CLASSES[index % CATEGORY_TILT_CLASSES.length]}
+              />
             );
           })}
         </div>
@@ -213,11 +216,26 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
 
       <button
         type="submit"
-        className="animate-fade-in-up mt-2 flex items-center justify-center gap-2 rounded-full bg-sunset-500 py-3.5 text-base font-bold text-white shadow-lg shadow-sunset-500/30 transition hover:-translate-y-0.5 hover:bg-sunset-600 hover:shadow-xl active:translate-y-0"
+        disabled={isTakingOff}
+        className="group animate-fade-in-up mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-lagoon-500 to-indigo-600 py-3.5 font-heading text-lg font-bold text-white shadow-lg shadow-indigo-900/30 transition hover:-translate-y-0.5 hover:from-lagoon-600 hover:to-indigo-700 hover:shadow-xl active:translate-y-0 disabled:cursor-wait"
         style={{ animationDelay: "480ms" }}
       >
-        <Icon name="plane" size={18} />
-        Buscar mi viaje ideal
+        <span className="relative flex items-center">
+          <span
+            className="pointer-events-none absolute right-full mr-1 flex items-center gap-1 opacity-0 transition-opacity duration-300 group-hover:opacity-70"
+            aria-hidden="true"
+          >
+            <span className="h-1 w-1 rounded-full bg-white/40" />
+            <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
+            <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
+          </span>
+          <Icon
+            name="plane"
+            size={18}
+            className={isTakingOff ? "animate-plane-takeoff" : "transition-transform duration-300 group-hover:translate-x-1.5"}
+          />
+        </span>
+        <span className={isTakingOff ? "animate-fade-out" : ""}>Buscar mi viaje ideal</span>
       </button>
     </form>
   );

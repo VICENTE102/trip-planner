@@ -1,10 +1,25 @@
 import { PREFERENCES } from "../types";
 import type { Preference } from "../types";
+import { TravelStamp } from "./TravelStamp";
+import type { IconName } from "./Icon";
 
 interface PreferenceChipsProps {
   selected: Preference[];
   onChange: (preferences: Preference[]) => void;
 }
+
+const PREFERENCE_ICONS: Record<Preference, IconName> = {
+  Playa: "sun",
+  Cultura: "mapPin",
+  Gastronomía: "utensils",
+  "Vida nocturna": "moon",
+  Naturaleza: "compass",
+  Compras: "suitcase",
+  Familia: "footprint",
+  Relax: "sun",
+};
+
+const TILT_CLASSES = ["-rotate-2", "rotate-1", "-rotate-1", "rotate-2", "-rotate-3", "rotate-3", "-rotate-2", "rotate-2"];
 
 export function PreferenceChips({ selected, onChange }: PreferenceChipsProps) {
   function toggle(preference: Preference) {
@@ -16,25 +31,19 @@ export function PreferenceChips({ selected, onChange }: PreferenceChipsProps) {
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {PREFERENCES.map((preference) => {
-        const isSelected = selected.includes(preference);
-        return (
-          <button
-            key={preference}
-            type="button"
-            onClick={() => toggle(preference)}
-            aria-pressed={isSelected}
-            className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
-              isSelected
-                ? "border-lagoon-400 bg-lagoon-400 text-ink-900"
-                : "border-white/30 bg-white/5 text-white/85 hover:border-lagoon-300 hover:bg-white/10"
-            }`}
-          >
-            {preference}
-          </button>
-        );
-      })}
+    <div className="flex flex-wrap gap-3">
+      {PREFERENCES.map((preference, index) => (
+        <TravelStamp
+          key={preference}
+          label={preference}
+          icon={PREFERENCE_ICONS[preference]}
+          isSelected={selected.includes(preference)}
+          onClick={() => toggle(preference)}
+          solidBgClass="bg-lagoon-500"
+          stripeClass="border-lagoon-400"
+          tiltClass={TILT_CLASSES[index % TILT_CLASSES.length]}
+        />
+      ))}
     </div>
   );
 }
