@@ -28,7 +28,7 @@ export interface SelectProposalsContext {
   // acoplar "elegir la mejor combinación" con "cómo se construye su
   // itinerario". Solo se llama 3 veces (una por propuesta final), nunca
   // sobre las 270 combinaciones candidatas.
-  buildItinerary: (combination: TripCombination) => ItineraryDay[];
+  buildItinerary: (combination: TripCombination) => Promise<ItineraryDay[]>;
 }
 
 // Sección 10.6: cada perfil pondera los mismos 6 criterios de forma
@@ -152,7 +152,11 @@ function buildWarnings(combination: TripCombination): string[] {
   return warnings;
 }
 
-function buildProposal(type: ProposalType, scored: ScoredCombination, context: SelectProposalsContext): TripProposal {
+async function buildProposal(
+  type: ProposalType,
+  scored: ScoredCombination,
+  context: SelectProposalsContext,
+): Promise<TripProposal> {
   const { combination, scoreBreakdown } = scored;
 
   return {
@@ -165,7 +169,7 @@ function buildProposal(type: ProposalType, scored: ScoredCombination, context: S
     scoreBreakdown,
     flight: combination.flight,
     accommodation: combination.accommodation,
-    itinerary: context.buildItinerary(combination),
+    itinerary: await context.buildItinerary(combination),
     budget: combination.budget,
     totalCost: combination.budget.totalTripCost,
     costPerPerson: round2(combination.budget.totalTripCost / context.travelers),
@@ -179,10 +183,10 @@ function buildProposal(type: ProposalType, scored: ScoredCombination, context: S
 // Sección 21 (Fase 8), pasos 7-8: elige económica/recomendada/confort
 // entre las combinaciones supervivientes (ya validadas y no dominadas),
 // evitando repetir la misma combinación en dos perfiles distintos.
-export function selectDiverseProposals(
+export async function selectDiverseProposals(
   scoredCombinations: ScoredCombination[],
   context: SelectProposalsContext,
-): TripProposal[] {
+): Promise<TripProposal[]> {
   const usedCombinationIds = new Set<string>();
   const proposals: TripProposal[] = [];
 
@@ -195,7 +199,7 @@ export function selectDiverseProposals(
     if (!winner) continue; // no quedan combinaciones distintas disponibles para este perfil
 
     usedCombinationIds.add(winner.combination.id);
-    proposals.push(buildProposal(type, winner, context));
+    proposals.push(await buildProposal(type, winner, context));
   }
 
   [...proposals]

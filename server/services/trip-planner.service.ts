@@ -4,11 +4,12 @@ import type { PreferenceProfile, ProviderSearchLog, TripCombination, TripProposa
 import { mockFlightProvider } from "../providers/mock-flight.provider.js";
 import { mockAccommodationProvider } from "../providers/mock-accommodation.provider.js";
 import { mockPlacesProvider } from "../providers/mock-places.provider.js";
+import { mockRoutesProvider } from "../providers/mock-routes.provider.js";
 import { buildScoreBreakdown, combineOffers } from "../algorithms/combine-offers.js";
 import { passesQualityThresholds, validateCombination, validateItinerary, repairInvalidItinerary } from "../algorithms/validate-trip.js";
 import { filterDominatedOptions } from "../algorithms/pareto-filter.js";
 import { selectDiverseProposals } from "../algorithms/select-proposals.js";
-import { buildTravelMatrixLookup, calculateTravelMatrix } from "../algorithms/cluster-places.js";
+import { buildTravelMatrixLookup } from "../algorithms/cluster-places.js";
 import { distributePlacesAcrossDays, scheduleDayActivities } from "../algorithms/schedule-itinerary.js";
 
 export interface GenerateTripResult {
@@ -37,15 +38,16 @@ function addDaysIso(dateIso: string, daysToAdd: number): string {
 }
 
 // Construye el itinerario real (Fase 10) de una combinación ganadora:
-// matriz de desplazamientos (hotel + actividades elegidas) -> agrupación
-// por proximidad y reparto entre días -> horario día a día -> validación y
-// reparación si hace falta. Solo se llama sobre las 3 combinaciones que
-// selectDiverseProposals() elige al final, nunca sobre las decenas o
-// cientos de candidatas evaluadas.
-function buildItineraryForCombination(
+// matriz de desplazamientos (hotel + actividades elegidas, vía RoutesProvider
+// — Fase 12: MockRoutesProvider hoy, Google Routes el día que se sustituya)
+// -> agrupación por proximidad y reparto entre días -> horario día a día ->
+// validación y reparación si hace falta. Solo se llama sobre las 3
+// combinaciones que selectDiverseProposals() elige al final, nunca sobre
+// las decenas o cientos de candidatas evaluadas.
+async function buildItineraryForCombination(
   combination: TripCombination,
   context: { days: number; departureDateIso: string; preferences: PreferenceProfile },
-): ItineraryDay[] {
+): Promise<ItineraryDay[]> {
   const hotel = {
     id: combination.accommodation.id,
     name: combination.accommodation.name,
@@ -61,7 +63,8 @@ function buildItineraryForCombination(
       longitude: activity.longitude,
     })),
   ];
-  const travelLookup = buildTravelMatrixLookup(calculateTravelMatrix(places));
+  const travelMatrix = await mockRoutesProvider.calculateTravelMatrix(places);
+  const travelLookup = buildTravelMatrixLookup(travelMatrix);
   const travelMinutes = (fromId: string, toId: string) => travelLookup.get(`${fromId}->${toId}`)?.travelMinutes ?? 0;
 
   const allocations = distributePlacesAcrossDays(combination.activities, context.days, context.preferences);
@@ -162,7 +165,7 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
   const nonDominated = filterDominatedOptions(validScored, (s) => s.scoreBreakdown);
   const discardedCombinations = combinations.length - nonDominated.length;
 
-  const proposals = selectDiverseProposals(nonDominated, {
+  const proposals = await selectDiverseProposals(nonDominated, {
     userBudget: request.budget,
     travelers,
     preferences,

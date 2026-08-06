@@ -1,23 +1,17 @@
+import type { TravelMatrixEntry } from "../types/route.js";
+
 export interface ClusterablePlace {
   id: string;
   latitude: number;
   longitude: number;
 }
 
-export interface TravelMatrixEntry {
-  fromId: string;
-  toId: string;
-  distanceKm: number;
-  travelMinutes: number;
-  transportMode: "walk" | "transit";
-}
-
 const EARTH_RADIUS_KM = 6371;
 const WALK_SPEED_KMH = 4.5;
 const TRANSIT_SPEED_KMH = 20;
 // Por debajo de esta distancia se asume que se va andando en vez de en
-// transporte (no hay proveedor real de rutas todavía, Fase 12/Google
-// Routes; esto es una estimación por distancia en línea recta).
+// transporte (implementación de MockRoutesProvider, Fase 12: estimación
+// por distancia en línea recta, no un dato verificado de Google Routes).
 const WALK_THRESHOLD_KM = 1.5;
 const MIN_TRAVEL_MINUTES = 5;
 
@@ -36,9 +30,9 @@ function haversineDistanceKm(a: ClusterablePlace, b: ClusterablePlace): number {
 }
 
 // calculateTravelMatrix(): estima tiempos de desplazamiento por distancia
-// en línea recta entre cada par de lugares (hotel + actividades). No hay
-// todavía Google Routes (Fase 12): es una aproximación explícita, no un
-// dato verificado.
+// en línea recta entre cada par de lugares (hotel + actividades). Es el
+// cálculo detrás de MockRoutesProvider (server/providers/mock-routes.provider.ts);
+// una implementación real de RoutesProvider lo sustituiría por Google Routes.
 export function calculateTravelMatrix(places: ClusterablePlace[]): TravelMatrixEntry[] {
   const entries: TravelMatrixEntry[] = [];
 
