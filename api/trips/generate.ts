@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { tripRequestSchema } from "../../server/schemas/trip.schema.js";
 import { generateTripProposals } from "../../server/services/trip-planner.service.js";
+import { persistTripGeneration } from "../../server/repositories/trip.repository.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = crypto.randomUUID();
@@ -37,7 +38,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    const { proposals, evaluatedCombinations, discardedCombinations } = await generateTripProposals(parsed.data);
+    const { proposals, evaluatedCombinations, discardedCombinations, providerSearches } =
+      await generateTripProposals(parsed.data);
+
+    await persistTripGeneration({
+      requestId,
+      requestSummary,
+      proposals,
+      providerSearches,
+    });
 
     return res.status(201).json({
       id: requestId,

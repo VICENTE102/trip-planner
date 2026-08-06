@@ -96,3 +96,10 @@ export interface ValidationError {
   message: string;
   path?: string;
 }
+
+// Sección 11: registro de cada consulta a un proveedor (Fase 11, tabla provider_searches).
+export interface ProviderSearchLog {
+  provider: "flights" | "accommodations" | "activities";
+  offerCount: number;
+  errors?: string[];
+}

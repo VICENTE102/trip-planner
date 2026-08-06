@@ -1,6 +1,6 @@
 import type { ValidatedTripRequest } from "../schemas/trip.schema.js";
 import type { ItineraryDay } from "../types/itinerary.js";
-import type { PreferenceProfile, TripCombination, TripProposal } from "../types/trip.js";
+import type { PreferenceProfile, ProviderSearchLog, TripCombination, TripProposal } from "../types/trip.js";
 import { mockFlightProvider } from "../providers/mock-flight.provider.js";
 import { mockAccommodationProvider } from "../providers/mock-accommodation.provider.js";
 import { mockPlacesProvider } from "../providers/mock-places.provider.js";
@@ -15,6 +15,7 @@ export interface GenerateTripResult {
   proposals: TripProposal[];
   evaluatedCombinations: number;
   discardedCombinations: number;
+  providerSearches: ProviderSearchLog[];
 }
 
 // Días completos de viaje (llegada y salida cuentan cada uno como un día),
@@ -128,6 +129,12 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     }),
   ]);
 
+  const providerSearches: ProviderSearchLog[] = [
+    { provider: "flights", offerCount: flights.length },
+    { provider: "accommodations", offerCount: accommodations.length },
+    { provider: "activities", offerCount: activities.length },
+  ];
+
   const combinations = combineOffers(flights, accommodations, activities, {
     travelers,
     days,
@@ -164,5 +171,5 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     buildItinerary: (combination) => buildItineraryForCombination(combination, { days, departureDateIso, preferences }),
   });
 
-  return { proposals, evaluatedCombinations: combinations.length, discardedCombinations };
+  return { proposals, evaluatedCombinations: combinations.length, discardedCombinations, providerSearches };
 }
