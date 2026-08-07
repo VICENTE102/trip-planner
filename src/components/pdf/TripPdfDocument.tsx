@@ -2,6 +2,7 @@ import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/render
 import type { SearchParams, TripProposal } from "../../types";
 import { formatDate } from "../../utils/dates";
 import { TIER_THEME } from "../../constants/tierTheme";
+import { getEffectiveRestaurant, getEffectiveText } from "../../utils/itineraryEdits";
 
 interface TripPdfDocumentProps {
   proposal: TripProposal;
@@ -188,35 +189,38 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
 
       <Page size="A4" style={styles.page}>
         <Text style={styles.sectionTitle}>Itinerario completo</Text>
-        {itinerary.days.map((day) => (
-          <View key={day.dayNumber} style={styles.dayBlock} wrap={false}>
-            <Text style={styles.dayHeading}>
-              Día {day.dayNumber} · {formatDate(day.date)}
-            </Text>
-
-            <View style={styles.block}>
-              <Text style={styles.blockLabel}>MAÑANA</Text>
-              <Text style={styles.blockText}>{day.morning}</Text>
-            </View>
-
-            <View style={styles.block}>
-              <Text style={styles.blockLabel}>RESTAURANTE RECOMENDADO</Text>
-              <Text style={styles.blockText}>
-                {day.restaurant.name} — {day.restaurant.description} ({day.restaurant.area})
+        {itinerary.days.map((day) => {
+          const restaurant = getEffectiveRestaurant(day);
+          return (
+            <View key={day.dayNumber} style={styles.dayBlock} wrap={false}>
+              <Text style={styles.dayHeading}>
+                Día {day.dayNumber} · {formatDate(day.date)}
               </Text>
-            </View>
 
-            <View style={styles.block}>
-              <Text style={styles.blockLabel}>TARDE</Text>
-              <Text style={styles.blockText}>{day.afternoon}</Text>
-            </View>
+              <View style={styles.block}>
+                <Text style={styles.blockLabel}>MAÑANA</Text>
+                <Text style={styles.blockText}>{getEffectiveText(day, "morning")}</Text>
+              </View>
 
-            <View style={styles.nightBlock}>
-              <Text style={styles.blockLabel}>NOCHE</Text>
-              <Text style={styles.nightText}>{day.night}</Text>
+              <View style={styles.block}>
+                <Text style={styles.blockLabel}>RESTAURANTE RECOMENDADO</Text>
+                <Text style={styles.blockText}>
+                  {restaurant.name} — {restaurant.description} ({restaurant.area})
+                </Text>
+              </View>
+
+              <View style={styles.block}>
+                <Text style={styles.blockLabel}>TARDE</Text>
+                <Text style={styles.blockText}>{getEffectiveText(day, "afternoon")}</Text>
+              </View>
+
+              <View style={styles.nightBlock}>
+                <Text style={styles.blockLabel}>NOCHE</Text>
+                <Text style={styles.nightText}>{getEffectiveText(day, "night")}</Text>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
         <Text
           style={styles.footer}
           fixed

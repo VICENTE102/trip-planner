@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SearchParams, TripProposal } from "../types";
+import type { ItineraryDay, SearchParams, TripProposal } from "../types";
 import { TIER_THEME } from "../constants/tierTheme";
 import { Tabs } from "./Tabs";
 import type { TabItem } from "./Tabs";
@@ -17,6 +17,8 @@ interface ProposalDetailViewProps {
   proposal: TripProposal;
   searchParams: SearchParams;
   onSave?: () => void;
+  editable?: boolean;
+  onUpdateDay?: (day: ItineraryDay) => void;
 }
 
 const SECTIONS: TabItem[] = [
@@ -27,7 +29,13 @@ const SECTIONS: TabItem[] = [
   { id: "gastos", label: "Gastos", icon: "compass" },
 ];
 
-export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalDetailViewProps) {
+export function ProposalDetailView({
+  proposal,
+  searchParams,
+  onSave,
+  editable,
+  onUpdateDay,
+}: ProposalDetailViewProps) {
   const [section, setSection] = useState("itinerario");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const { tier, hotel, itinerary, economicSummary } = proposal;
@@ -133,10 +141,22 @@ export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalD
         className={`animate-slide-in-trail p-4 ${section === "itinerario" || section === "dia-a-dia" ? "" : "max-w-2xl"}`}
       >
         {section === "itinerario" && (
-          <ItineraryPreview itinerary={itinerary} searchParams={searchParams} tier={tier} />
+          <ItineraryPreview
+            itinerary={itinerary}
+            searchParams={searchParams}
+            tier={tier}
+            editable={editable}
+            onUpdateDay={onUpdateDay}
+          />
         )}
         {section === "dia-a-dia" && (
-          <DayByDayView itinerary={itinerary} searchParams={searchParams} tier={tier} />
+          <DayByDayView
+            itinerary={itinerary}
+            searchParams={searchParams}
+            tier={tier}
+            editable={editable}
+            onUpdateDay={onUpdateDay}
+          />
         )}
         {section === "alojamiento" && <HotelCard hotel={hotel} bookingUrl={hotelBookingUrl} />}
         {section === "vuelos" && <FlightSummary itinerary={itinerary} searchParams={searchParams} />}

@@ -1,18 +1,26 @@
-import type { Itinerary, SearchParams, TierLevel } from "../types";
+import type { Itinerary, ItineraryDay, SearchParams, TierLevel } from "../types";
 import { DayCard } from "./DayCard";
 
 interface ItineraryPreviewProps {
   itinerary: Itinerary;
   searchParams: SearchParams;
   tier: TierLevel;
+  editable?: boolean;
+  onUpdateDay?: (day: ItineraryDay) => void;
 }
 
-export function ItineraryPreview({ itinerary, searchParams, tier }: ItineraryPreviewProps) {
+export function ItineraryPreview({ itinerary, searchParams, tier, editable, onUpdateDay }: ItineraryPreviewProps) {
   return (
     <ol className="grid gap-4 lg:grid-cols-2">
       {itinerary.days.map((day) => (
         <li key={day.dayNumber}>
-          <DayCard day={day} searchParams={searchParams} tier={tier} />
+          <DayCard
+            day={day}
+            searchParams={searchParams}
+            tier={tier}
+            editable={editable}
+            onUpdateDay={onUpdateDay}
+          />
         </li>
       ))}
     </ol>

@@ -64,6 +64,17 @@ export interface DayStop {
   lng: number;
 }
 
+// Capa de ediciones del usuario sobre un día generado. Nunca sobrescribe los
+// campos originales (morning/afternoon/night/restaurant en ItineraryDay) —
+// se guarda aparte para poder "restaurar" un bloque sin perder lo que generó
+// el motor. Un campo ausente aquí significa "sin editar, usar el original".
+export interface DayEdits {
+  morning?: string;
+  afternoon?: string;
+  night?: string;
+  restaurant?: Partial<Omit<Restaurant, "tier">>;
+}
+
 export interface ItineraryDay {
   dayNumber: number;
   date: string; // ISO date
@@ -77,6 +88,7 @@ export interface ItineraryDay {
   // Coordenadas ficticias y deterministas (ver src/utils/geo.ts) para pintar
   // el mapa de "Día a día" mientras no hay coordenadas reales.
   stops: DayStop[];
+  edits?: DayEdits;
 }
 
 export interface Itinerary {

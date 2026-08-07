@@ -1,12 +1,14 @@
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { localTripStorage } from "../services/tripStorage";
+import type { ItineraryDay } from "../types";
+import { useTrips } from "../hooks/useTrips";
 import { ProposalDetailView } from "../components/ProposalDetailView";
 import { Icon } from "../components/Icon";
 
 export function TripDetailScreen() {
   const { tripId } = useParams<{ tripId: string }>();
   const navigate = useNavigate();
-  const trip = tripId ? localTripStorage.getById(tripId) : undefined;
+  const { trips, saveTrip, removeTrip } = useTrips();
+  const trip = tripId ? trips.find((t) => t.id === tripId) : undefined;
 
   if (!trip) {
     return <Navigate to="/mis-viajes" replace />;
@@ -14,9 +16,22 @@ export function TripDetailScreen() {
 
   function handleDelete() {
     if (window.confirm("¿Eliminar este viaje guardado?")) {
-      localTripStorage.remove(trip!.id);
+      removeTrip(trip!.id);
       navigate("/mis-viajes");
     }
+  }
+
+  function handleUpdateDay(updatedDay: ItineraryDay) {
+    const days = trip!.proposal.itinerary.days.map((day) =>
+      day.dayNumber === updatedDay.dayNumber ? updatedDay : day,
+    );
+    saveTrip({
+      ...trip!,
+      proposal: {
+        ...trip!.proposal,
+        itinerary: { ...trip!.proposal.itinerary, days },
+      },
+    });
   }
 
   const { searchParams, proposal } = trip;
@@ -35,7 +50,12 @@ export function TripDetailScreen() {
         </p>
       </div>
 
-      <ProposalDetailView proposal={proposal} searchParams={searchParams} />
+      <ProposalDetailView
+        proposal={proposal}
+        searchParams={searchParams}
+        editable
+        onUpdateDay={handleUpdateDay}
+      />
 
       <button
         type="button"
