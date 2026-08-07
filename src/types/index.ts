@@ -56,6 +56,14 @@ export interface Restaurant {
   tier: TierLevel;
 }
 
+export interface DayStop {
+  id: string;
+  label: string;
+  text: string;
+  lat: number;
+  lng: number;
+}
+
 export interface ItineraryDay {
   dayNumber: number;
   date: string; // ISO date
@@ -66,6 +74,9 @@ export interface ItineraryDay {
   afternoon: string;
   afternoonActivityId: string;
   night: string;
+  // Coordenadas ficticias y deterministas (ver src/utils/geo.ts) para pintar
+  // el mapa de "Día a día" mientras no hay coordenadas reales.
+  stops: DayStop[];
 }
 
 export interface Itinerary {

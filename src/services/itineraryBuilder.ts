@@ -1,12 +1,18 @@
-import type { Flight, Itinerary, ItineraryDay, SearchParams, TierLevel } from "../types";
+import type { DayStop, Flight, Itinerary, ItineraryDay, SearchParams, TierLevel } from "../types";
 import { addDays, nightsBetween } from "../utils/dates";
 import { createSeededRandom, hashString } from "../utils/random";
+import { fakeCityCenter, jitterCoordinates } from "../utils/geo";
 import {
   buildRestaurant,
   pickAfternoonActivity,
   pickMorningActivity,
   pickNightActivity,
 } from "./mockContent";
+
+// Dispersión del jitter alrededor del centro ficticio del destino: lo
+// bastante amplia para que las paradas de un mismo día no queden todas
+// apiladas en el mapa, sin salirse del área que el centro representa.
+const STOP_COORDINATE_SPREAD = 0.06;
 
 export function buildItinerary(
   params: SearchParams,
@@ -18,6 +24,7 @@ export function buildItinerary(
   const random = createSeededRandom(
     hashString(`${params.destination}-${params.departureDate}-${tier}-itinerary`),
   );
+  const cityCenter = fakeCityCenter(params.destination);
 
   const days: ItineraryDay[] = [];
   // Texto del bloque equivalente del día anterior, para no repetir la
@@ -42,6 +49,33 @@ export function buildItinerary(
     previousAfternoonText = afternoonActivity.text;
     previousNightText = night;
 
+    const stops: DayStop[] = [
+      {
+        id: morningActivity.id,
+        label: isArrivalDay ? "Llegada" : "Mañana",
+        text: morningActivity.text,
+        ...jitterCoordinates(cityCenter, random, STOP_COORDINATE_SPREAD),
+      },
+      {
+        id: "restaurante",
+        label: "Restaurante",
+        text: `${restaurant.name} (${restaurant.area})`,
+        ...jitterCoordinates(cityCenter, random, STOP_COORDINATE_SPREAD),
+      },
+      {
+        id: afternoonActivity.id,
+        label: "Tarde",
+        text: afternoonActivity.text,
+        ...jitterCoordinates(cityCenter, random, STOP_COORDINATE_SPREAD),
+      },
+      {
+        id: "noche",
+        label: "Noche",
+        text: night,
+        ...jitterCoordinates(cityCenter, random, STOP_COORDINATE_SPREAD),
+      },
+    ];
+
     days.push({
       dayNumber: day,
       date: addDays(params.departureDate, day - 1),
@@ -52,6 +86,7 @@ export function buildItinerary(
       afternoon: afternoonActivity.text,
       afternoonActivityId: afternoonActivity.id,
       night,
+      stops,
     });
   }
 

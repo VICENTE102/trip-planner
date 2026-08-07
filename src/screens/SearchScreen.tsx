@@ -3,7 +3,7 @@ import { SearchForm } from "../components/SearchForm";
 import { WorldCollage } from "../components/WorldCollage";
 import { Icon } from "../components/Icon";
 import type { SearchParams } from "../types";
-import { formatTripApiError, generateTrip } from "../services/trip-api.client";
+import { generateTrip } from "../services/trip-api.client";
 
 const GENERATION_STORAGE_KEY = "tripplanner:lastGeneration";
 
@@ -11,11 +11,16 @@ export function SearchScreen() {
   const navigate = useNavigate();
 
   async function handleSubmit(params: SearchParams) {
+    // El viaje que se muestra en /results siempre se genera en el cliente
+    // (searchService.ts), no a partir de esta llamada — esta solo registra
+    // la búsqueda en el backend (Fase 11, persistencia best-effort). Si
+    // falla o el backend no está disponible (p. ej. en `npm run dev` sin
+    // `vercel dev`), no debe bloquear al usuario para ver sus propuestas.
     try {
       const generation = await generateTrip(params);
       sessionStorage.setItem(GENERATION_STORAGE_KEY, JSON.stringify(generation));
     } catch (error) {
-      throw new Error(formatTripApiError(error));
+      console.warn("No se pudo registrar la búsqueda en el backend:", error);
     }
     navigate("/results", { state: { searchParams: params } });
   }

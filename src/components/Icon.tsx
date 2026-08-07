@@ -9,7 +9,8 @@ export type IconName =
   | "moon"
   | "externalLink"
   | "footprint"
-  | "utensils";
+  | "utensils"
+  | "download";
 
 interface IconProps {
   name: IconName;
@@ -68,6 +69,13 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M4 2v6a1 1 0 0 0 1 1h0a1 1 0 0 0 1-1V2M6 9v13" />
       <path d="M17 2c-1.5 1.5-2 3.5-2 6 0 1.5 1 2.5 2 3v11" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
     </>
   ),
 };

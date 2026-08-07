@@ -6,8 +6,12 @@ import type { TabItem } from "./Tabs";
 import { HotelCard } from "./HotelCard";
 import { FlightSummary } from "./FlightSummary";
 import { ItineraryPreview } from "./ItineraryPreview";
+import { DayByDayView } from "./DayByDayView";
 import { EconomicSummaryView } from "./EconomicSummaryView";
+import { Icon } from "./Icon";
 import { getHotelLink } from "../services/deepLinks";
+import { useDestinationImage } from "../hooks/useDestinationImage";
+import { normalizeCityName } from "../utils/text";
 
 interface ProposalDetailViewProps {
   proposal: TripProposal;
@@ -17,6 +21,7 @@ interface ProposalDetailViewProps {
 
 const SECTIONS: TabItem[] = [
   { id: "itinerario", label: "Itinerario completo", icon: "sun" },
+  { id: "dia-a-dia", label: "Día a día", icon: "mapPin" },
   { id: "alojamiento", label: "Alojamiento", icon: "suitcase" },
   { id: "vuelos", label: "Vuelos", icon: "plane" },
   { id: "gastos", label: "Gastos", icon: "compass" },
@@ -24,6 +29,7 @@ const SECTIONS: TabItem[] = [
 
 export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalDetailViewProps) {
   const [section, setSection] = useState("itinerario");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const { tier, hotel, itinerary, economicSummary } = proposal;
   const theme = TIER_THEME[tier];
   const isOverBudget = economicSummary.remaining < 0;
@@ -41,6 +47,36 @@ export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalD
     searchParams.returnDate,
     searchParams.travelers + searchParams.children,
   );
+
+  const heroImage = useDestinationImage(searchParams.destination);
+  const pdfFileName = `viaje-${normalizeCityName(searchParams.destination).replace(/\s+/g, "-")}-${tier}.pdf`;
+
+  // @react-pdf/renderer arrastra su propio motor de fuentes/layout (varios
+  // cientos de KB) — se carga bajo demanda para no pesar en el bundle
+  // principal a usuarios que nunca descargan el PDF.
+  async function handleDownloadPdf() {
+    setIsGeneratingPdf(true);
+    try {
+      const [{ pdf }, { TripPdfDocument }, { downscaleImageForPdf }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("./pdf/TripPdfDocument"),
+        import("./pdf/downscaleImage"),
+      ]);
+      const heroImageForPdf = heroImage ? await downscaleImageForPdf(heroImage) : null;
+      const blob = await pdf(
+        <TripPdfDocument proposal={proposal} searchParams={searchParams} heroImageUrl={heroImageForPdf} />,
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = pdfFileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
@@ -66,6 +102,16 @@ export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalD
                 : `Sobran ${economicSummary.remaining}€`}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={isGeneratingPdf}
+            className="flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-4 py-2.5 text-sm font-bold text-ink-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-60"
+          >
+            <Icon name="download" size={15} />
+            {isGeneratingPdf ? "Generando..." : "Descargar PDF"}
+          </button>
+
           {onSave && (
             <button
               type="button"
@@ -84,10 +130,13 @@ export function ProposalDetailView({ proposal, searchParams, onSave }: ProposalD
 
       <div
         key={section}
-        className={`animate-slide-in-trail p-4 ${section === "itinerario" ? "" : "max-w-2xl"}`}
+        className={`animate-slide-in-trail p-4 ${section === "itinerario" || section === "dia-a-dia" ? "" : "max-w-2xl"}`}
       >
         {section === "itinerario" && (
           <ItineraryPreview itinerary={itinerary} searchParams={searchParams} tier={tier} />
+        )}
+        {section === "dia-a-dia" && (
+          <DayByDayView itinerary={itinerary} searchParams={searchParams} tier={tier} />
         )}
         {section === "alojamiento" && <HotelCard hotel={hotel} bookingUrl={hotelBookingUrl} />}
         {section === "vuelos" && <FlightSummary itinerary={itinerary} searchParams={searchParams} />}
