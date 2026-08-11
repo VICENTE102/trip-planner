@@ -46,18 +46,97 @@ interface BudgetBreakdown {
   totalTripCost: number;
 }
 
-// flight/accommodation/itinerary se dejan sin tipar en detalle: el
-// frontend todavía no renderiza estos datos (siguen viniendo de
-// searchService.ts, ver Fase 4), solo los guarda en sessionStorage. Se
-// tipará en profundidad cuando /results empiece a consumirlos de verdad.
+// Espejo de server/types/*: estos tipos describen lo que /api/trips/generate
+// devuelve por la red, no lo que renderiza la interfaz. La traducción de
+// unos a otros vive en un único sitio, services/tripAdapter.ts.
+export interface FlightSegment {
+  id: string;
+  origin: string;
+  destination: string;
+  departureTime: string; // ISO datetime
+  arrivalTime: string; // ISO datetime
+  carrier: string;
+  flightNumber: string;
+  durationMinutes: number;
+}
+
+export interface FlightOffer {
+  id: string;
+  provider: string;
+  totalPrice: number; // ida y vuelta, todos los viajeros
+  currency: string;
+  outbound: FlightSegment[];
+  inbound?: FlightSegment[];
+  totalDurationMinutes: number;
+  stops: number;
+  baggageIncluded: boolean;
+  refundable: boolean;
+  bookingUrl?: string;
+  fetchedAt: string;
+}
+
+export interface AccommodationOffer {
+  id: string;
+  provider: string;
+  name: string;
+  totalPrice: number;
+  currency: string;
+  rating?: number;
+  reviewCount?: number;
+  latitude: number;
+  longitude: number;
+  distanceToCenterKm?: number;
+  breakfastIncluded?: boolean;
+  freeCancellation?: boolean;
+  amenities: string[];
+  capacity: number;
+  bookingUrl?: string;
+  fetchedAt: string;
+}
+
+export type ItineraryItemType =
+  | "arrival"
+  | "transfer"
+  | "hotel"
+  | "meal"
+  | "visit"
+  | "walk"
+  | "free_time";
+
+export interface ItineraryItem {
+  id: string;
+  startTime: string; // ISO datetime
+  endTime: string; // ISO datetime
+  type: ItineraryItemType;
+  title: string;
+  description?: string;
+  placeId?: string;
+  latitude?: number;
+  longitude?: number;
+  durationMinutes: number;
+  travelMinutesFromPrevious?: number;
+  transportMode?: string;
+  costPerPerson?: number;
+  bookingRequired?: boolean;
+  bookingUrl?: string;
+  verificationStatus: "verified" | "partial" | "unverified";
+  notes?: string[];
+}
+
+export interface BackendItineraryDay {
+  dayNumber: number;
+  date: string; // ISO date
+  items: ItineraryItem[];
+}
+
 export interface TripProposal {
   type: ProposalType;
   score: number;
   rank: number;
   scoreBreakdown: ScoreBreakdown;
-  flight: Record<string, unknown>;
-  accommodation: Record<string, unknown>;
-  itinerary: unknown[];
+  flight: FlightOffer;
+  accommodation: AccommodationOffer;
+  itinerary: BackendItineraryDay[];
   budget: BudgetBreakdown;
   totalCost: number;
   costPerPerson: number;
@@ -71,7 +150,13 @@ export interface GenerateTripResponse {
   id: string;
   status: string;
   request: Record<string, unknown>;
-  metadata: { evaluatedCombinations: number; discardedCombinations: number };
+  metadata: {
+    evaluatedCombinations: number;
+    discardedCombinations: number;
+    // Coste de la opción más barata evaluada, viable o no: es lo que
+    // permite decir cuánto falta cuando proposals viene vacío.
+    cheapestTotalCost: number | null;
+  };
   proposals: TripProposal[];
 }
 

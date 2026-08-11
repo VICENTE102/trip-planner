@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    const { proposals, evaluatedCombinations, discardedCombinations, providerSearches } =
+    const { proposals, evaluatedCombinations, discardedCombinations, cheapestTotalCost, providerSearches } =
       await generateTripProposals(parsed.data);
 
     await persistTripGeneration({
@@ -52,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: requestId,
       status: "generated",
       request: requestSummary,
-      metadata: { evaluatedCombinations, discardedCombinations },
+      metadata: { evaluatedCombinations, discardedCombinations, cheapestTotalCost },
       proposals,
     });
   } catch (error) {

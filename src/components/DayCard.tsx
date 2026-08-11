@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ItineraryDay, Restaurant, SearchParams, TierLevel } from "../types";
+import type { DayMeal, ItineraryDay, Restaurant, SearchParams, TierLevel } from "../types";
 import { formatDate } from "../utils/dates";
 import {
   clearDayTextEdit,
@@ -188,6 +188,26 @@ function EditControls({
   );
 }
 
+function MealNode({ meal, imageOnRight }: { meal: DayMeal; imageOnRight: boolean }) {
+  return (
+    <TimelineNode
+      icon="utensils"
+      markerClass="bg-ink-500"
+      title={`${meal.title} · ${meal.time}`}
+      titleColorClass="text-ink-500"
+      text={
+        meal.costPerPerson !== undefined
+          ? `Presupuesto estimado de ${meal.costPerPerson}€ por persona. Aún sin restaurante asignado.`
+          : "Aún sin restaurante asignado."
+      }
+      imageSrc={null}
+      imageFallbackIcon={RESTAURANT_FALLBACK_ICON}
+      imageShape="circle"
+      imageOnRight={imageOnRight}
+    />
+  );
+}
+
 interface TimelineNodeProps {
   icon: IconName;
   markerClass: string;
@@ -279,6 +299,12 @@ export function DayCard({
   const nightText = getEffectiveText(day, "night");
   const restaurant = getEffectiveRestaurant(day);
 
+  // La tarjeta tiene un orden fijo (mañana → tarde → noche), así que las
+  // comidas se reparten por su hora real en vez de pintarlas todas juntas:
+  // si no, una cena de las 20:36 aparecería por encima del bloque "Tarde".
+  const middayMeals = day.meals?.filter((meal) => meal.time < "20:00") ?? [];
+  const eveningMeals = day.meals?.filter((meal) => meal.time >= "20:00") ?? [];
+
   function saveTextField(field: DayTextField, value: string) {
     onUpdateDay?.(setDayTextEdit(day, field, value));
     setEditingField(null);
@@ -353,31 +379,40 @@ export function DayCard({
             }
           />
 
-          <TimelineNode
-            icon="utensils"
-            markerClass="bg-ink-500"
-            title="Restaurante recomendado"
-            titleColorClass="text-ink-500"
-            text={`${restaurant.name} — ${restaurant.description} (${restaurant.area})`}
-            imageSrc={getRestaurantImage(restaurant.tier)}
-            imageFallbackIcon={RESTAURANT_FALLBACK_ICON}
-            imageShape="circle"
-            imageOnRight={imageOnRight}
-            editable={editable}
-            isEdited={isRestaurantEdited(day)}
-            isEditing={editingField === "restaurant"}
-            onStartEdit={() => setEditingField("restaurant")}
-            onRestore={restoreRestaurant}
-            editSlot={<RestaurantEditForm restaurant={restaurant} onSave={saveRestaurant} onCancel={() => setEditingField(null)} />}
-            action={
-              <ExternalLinkButton
-                href={getGoogleMapsLink(restaurant.name, searchParams.destination)}
-                label="Ver ubicación"
-                icon="mapPin"
-                variant="location"
-              />
-            }
-          />
+          {restaurant ? (
+            <TimelineNode
+              icon="utensils"
+              markerClass="bg-ink-500"
+              title="Restaurante recomendado"
+              titleColorClass="text-ink-500"
+              text={`${restaurant.name} — ${restaurant.description} (${restaurant.area})`}
+              imageSrc={getRestaurantImage(restaurant.tier)}
+              imageFallbackIcon={RESTAURANT_FALLBACK_ICON}
+              imageShape="circle"
+              imageOnRight={imageOnRight}
+              editable={editable}
+              isEdited={isRestaurantEdited(day)}
+              isEditing={editingField === "restaurant"}
+              onStartEdit={() => setEditingField("restaurant")}
+              onRestore={restoreRestaurant}
+              editSlot={<RestaurantEditForm restaurant={restaurant} onSave={saveRestaurant} onCancel={() => setEditingField(null)} />}
+              action={
+                <ExternalLinkButton
+                  href={getGoogleMapsLink(restaurant.name, searchParams.destination)}
+                  label="Ver ubicación"
+                  icon="mapPin"
+                  variant="location"
+                />
+              }
+            />
+          ) : (
+            // Comidas reales del motor: hora y coste estimado, sin local.
+            // No son editables ni enlazan a un mapa porque no hay ningún
+            // sitio concreto al que apuntar.
+            middayMeals.map((meal) => (
+              <MealNode key={meal.id} meal={meal} imageOnRight={imageOnRight} />
+            ))
+          )}
 
           <TimelineNode
             icon="compass"
@@ -412,6 +447,10 @@ export function DayCard({
               )
             }
           />
+
+          {eveningMeals.map((meal) => (
+            <MealNode key={meal.id} meal={meal} imageOnRight={imageOnRight} />
+          ))}
         </div>
       </div>
 

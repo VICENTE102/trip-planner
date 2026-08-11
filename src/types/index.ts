@@ -46,7 +46,12 @@ export interface Flight {
   arrivalTime: string;
   durationMinutes: number;
   stops: number;
-  price: number;
+  // Opcional porque el backend cotiza el vuelo como una única oferta de ida
+  // y vuelta (FlightOffer.totalPrice), no un precio por trayecto: en ese
+  // caso el importe vive en Itinerary.flightsTotalPrice y aquí queda sin
+  // definir, en vez de repetir el total en cada trayecto y aparentar el
+  // doble de lo que cuesta.
+  price?: number;
 }
 
 export interface Restaurant {
@@ -75,13 +80,28 @@ export interface DayEdits {
   restaurant?: Partial<Omit<Restaurant, "tier">>;
 }
 
+// Comida real programada por el motor del backend: sabe la hora y el coste
+// estimado, pero no el sitio (no hay proveedor de restaurantes todavía).
+// Se muestra tal cual en vez de inventar un restaurante con nombre y zona.
+export interface DayMeal {
+  id: string;
+  title: string; // "Comida" | "Cena"
+  time: string; // "14:00"
+  costPerPerson?: number;
+}
+
 export interface ItineraryDay {
   dayNumber: number;
   date: string; // ISO date
   isArrivalDay: boolean;
   morning: string;
   morningActivityId: string;
-  restaurant: Restaurant;
+  // Un día trae `restaurant` (generador antiguo del cliente, que inventa el
+  // local) o `meals` (motor del backend, que solo sabe hora y coste), nunca
+  // los dos. Ambos son opcionales para que ninguna vista dé por hecho que
+  // hay un restaurante con nombre que enseñar.
+  restaurant?: Restaurant;
+  meals?: DayMeal[];
   afternoon: string;
   afternoonActivityId: string;
   night: string;
@@ -96,14 +116,23 @@ export interface Itinerary {
   totalNights: number;
   outboundFlight?: Flight;
   returnFlight?: Flight;
+  // Precio de ida y vuelta para todos los viajeros, cuando el proveedor
+  // cotiza el vuelo entero de una vez (ver Flight.price).
+  flightsTotalPrice?: number;
   days: ItineraryDay[];
 }
 
 export interface EconomicSummary {
   accommodation: number;
   meals: number;
-  transport: number;
+  transport: number; // transporte local en destino
   activities: number;
+  // Partidas que solo calcula el motor del backend (BudgetBreakdown). Son
+  // opcionales porque el generador antiguo del cliente no las reparte: si
+  // faltan, la vista de gastos simplemente no pinta esas filas.
+  mainTransport?: number; // vuelos
+  insurance?: number;
+  emergencyReserve?: number;
   total: number;
   budgetReference: number;
   remaining: number;

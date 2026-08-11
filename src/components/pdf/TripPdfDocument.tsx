@@ -202,12 +202,27 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
                 <Text style={styles.blockText}>{getEffectiveText(day, "morning")}</Text>
               </View>
 
-              <View style={styles.block}>
-                <Text style={styles.blockLabel}>RESTAURANTE RECOMENDADO</Text>
-                <Text style={styles.blockText}>
-                  {restaurant.name} — {restaurant.description} ({restaurant.area})
-                </Text>
-              </View>
+              {restaurant ? (
+                <View style={styles.block}>
+                  <Text style={styles.blockLabel}>RESTAURANTE RECOMENDADO</Text>
+                  <Text style={styles.blockText}>
+                    {restaurant.name} — {restaurant.description} ({restaurant.area})
+                  </Text>
+                </View>
+              ) : (
+                day.meals?.map((meal) => (
+                  <View key={meal.id} style={styles.block}>
+                    <Text style={styles.blockLabel}>
+                      {meal.title.toUpperCase()} · {meal.time}
+                    </Text>
+                    <Text style={styles.blockText}>
+                      {meal.costPerPerson !== undefined
+                        ? `Presupuesto estimado de ${meal.costPerPerson}€ por persona. Aún sin restaurante asignado.`
+                        : "Aún sin restaurante asignado."}
+                    </Text>
+                  </View>
+                ))
+              )}
 
               <View style={styles.block}>
                 <Text style={styles.blockLabel}>TARDE</Text>
@@ -250,13 +265,19 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
             <>
               <Text style={styles.summaryLine}>
                 Ida · {outboundFlight.airline} · {outboundFlight.departureTime}–{outboundFlight.arrivalTime} ·{" "}
-                {outboundFlight.stops === 0 ? "directo" : `${outboundFlight.stops} escala(s)`} ·{" "}
-                {outboundFlight.price}€
+                {outboundFlight.stops === 0 ? "directo" : `${outboundFlight.stops} escala(s)`}
+                {outboundFlight.price !== undefined ? ` · ${outboundFlight.price}€` : ""}
               </Text>
               <Text style={styles.summaryLine}>
                 Vuelta · {returnFlight.airline} · {returnFlight.departureTime}–{returnFlight.arrivalTime} ·{" "}
-                {returnFlight.stops === 0 ? "directo" : `${returnFlight.stops} escala(s)`} · {returnFlight.price}€
+                {returnFlight.stops === 0 ? "directo" : `${returnFlight.stops} escala(s)`}
+                {returnFlight.price !== undefined ? ` · ${returnFlight.price}€` : ""}
               </Text>
+              {itinerary.flightsTotalPrice !== undefined && (
+                <Text style={styles.summarySubline}>
+                  Ida y vuelta, {travelers} viajero{travelers > 1 ? "s" : ""}: {itinerary.flightsTotalPrice}€
+                </Text>
+              )}
             </>
           ) : (
             <Text style={styles.summarySubline}>No hay datos de vuelo simulados para este viaje.</Text>
@@ -269,18 +290,40 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
             <Text>Alojamiento</Text>
             <Text>{economicSummary.accommodation}€</Text>
           </View>
+          {economicSummary.mainTransport !== undefined && (
+            <View style={styles.expenseRow}>
+              <Text>Vuelos</Text>
+              <Text>{economicSummary.mainTransport}€</Text>
+            </View>
+          )}
           <View style={styles.expenseRow}>
             <Text>Comidas (estimado)</Text>
             <Text>{economicSummary.meals}€</Text>
           </View>
           <View style={styles.expenseRow}>
-            <Text>Transporte (estimado)</Text>
+            <Text>
+              {economicSummary.mainTransport !== undefined
+                ? "Transporte local (estimado)"
+                : "Transporte (estimado)"}
+            </Text>
             <Text>{economicSummary.transport}€</Text>
           </View>
           <View style={styles.expenseRow}>
             <Text>Entradas y actividades (estimado)</Text>
             <Text>{economicSummary.activities}€</Text>
           </View>
+          {economicSummary.insurance !== undefined && (
+            <View style={styles.expenseRow}>
+              <Text>Seguro de viaje</Text>
+              <Text>{economicSummary.insurance}€</Text>
+            </View>
+          )}
+          {economicSummary.emergencyReserve !== undefined && (
+            <View style={styles.expenseRow}>
+              <Text>Reserva de emergencia</Text>
+              <Text>{economicSummary.emergencyReserve}€</Text>
+            </View>
+          )}
           <View style={styles.expenseTotalRow}>
             <Text>TOTAL</Text>
             <Text>{economicSummary.total}€</Text>
@@ -294,7 +337,9 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
             </Text>
           </View>
           <Text style={styles.disclaimer}>
-            Estimación orientativa. No incluye seguro de viaje, propinas u otros extras.
+            {economicSummary.insurance !== undefined
+              ? "Estimación orientativa. No incluye propinas u otros extras."
+              : "Estimación orientativa. No incluye seguro de viaje, propinas u otros extras."}
           </Text>
         </View>
 

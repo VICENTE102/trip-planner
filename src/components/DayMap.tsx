@@ -46,6 +46,20 @@ export function DayMap({ stops, tier }: DayMapProps) {
   const color = TIER_HEX[tier];
   const positions: [number, number][] = stops.map((stop) => [stop.lat, stop.lng]);
 
+  // Un día puede quedarse sin ninguna parada con coordenadas (p. ej. el día
+  // de llegada, ocupado por el vuelo y el registro en el hotel). Leaflet
+  // lanza si se le pasa un centro indefinido o unos bounds vacíos, así que
+  // ese caso se resuelve antes de montar el mapa.
+  if (positions.length === 0) {
+    return (
+      <div className="flex h-[420px] items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-ink-50 p-6 text-center lg:h-full">
+        <p className="text-sm text-ink-500">
+          Este día no tiene visitas programadas, así que no hay ruta que dibujar en el mapa.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[420px] overflow-hidden rounded-2xl border border-ink-200 lg:h-full">
       <MapContainer center={positions[0]} zoom={14} style={{ height: "100%", width: "100%" }}>

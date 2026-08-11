@@ -16,6 +16,12 @@ export interface GenerateTripResult {
   proposals: TripProposal[];
   evaluatedCombinations: number;
   discardedCombinations: number;
+  // Coste de la combinación más barata que se llegó a evaluar, aunque no
+  // sobreviviera a la validación. Es lo único que permite explicarle al
+  // usuario *cuánto* le falta cuando no hay ninguna propuesta viable
+  // ("la opción más económica son 962 €") en vez de un "no hay resultados"
+  // seco. null solo si no se pudo formar ninguna combinación.
+  cheapestTotalCost: number | null;
   providerSearches: ProviderSearchLog[];
 }
 
@@ -174,5 +180,15 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     buildItinerary: (combination) => buildItineraryForCombination(combination, { days, departureDateIso, preferences }),
   });
 
-  return { proposals, evaluatedCombinations: combinations.length, discardedCombinations, providerSearches };
+  const cheapestTotalCost = combinations.length
+    ? Math.round(Math.min(...combinations.map((combination) => combination.budget.totalTripCost)))
+    : null;
+
+  return {
+    proposals,
+    evaluatedCombinations: combinations.length,
+    discardedCombinations,
+    cheapestTotalCost,
+    providerSearches,
+  };
 }

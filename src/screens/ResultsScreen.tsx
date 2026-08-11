@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import type { SearchParams, TierLevel, Trip } from "../types";
-import { buildSearchResult } from "../services/searchService";
+import type { GenerateTripResponse } from "../services/trip-api.client";
+import { toSearchResult } from "../services/tripAdapter";
 import { ProposalDetailView } from "../components/ProposalDetailView";
 import { ProposalCompareRow } from "../components/ProposalCompareRow";
 import { Tabs } from "../components/Tabs";
@@ -14,6 +15,7 @@ import { TIER_THEME } from "../constants/tierTheme";
 
 interface ResultsLocationState {
   searchParams: SearchParams;
+  generation: GenerateTripResponse;
 }
 
 const CATEGORY_TO_TIER: Record<SearchParams["category"], TierLevel> = {
@@ -22,8 +24,6 @@ const CATEGORY_TO_TIER: Record<SearchParams["category"], TierLevel> = {
   comodo: "caro",
 };
 
-const TIER_ORDER: TierLevel[] = ["barato", "medio", "caro"];
-
 export function ResultsScreen() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,12 +31,18 @@ export function ResultsScreen() {
   const state = location.state as ResultsLocationState | null;
 
   const searchResult = useMemo(
-    () => (state?.searchParams ? buildSearchResult(state.searchParams) : null),
+    () => (state?.searchParams && state.generation ? toSearchResult(state.generation, state.searchParams) : null),
     [state],
   );
 
-  const highlightedTier = searchResult ? CATEGORY_TO_TIER[searchResult.searchParams.category] : undefined;
-  const [activeTab, setActiveTab] = useState<string>(highlightedTier ?? "comparativa");
+  // El motor devuelve solo las propuestas que sobreviven a la validación:
+  // pueden ser 3, 2, 1 o ninguna. La pestaña preseleccionada es la que pidió
+  // el usuario solo si existe de verdad; si no, se abre la comparativa.
+  const requestedTier = searchResult ? CATEGORY_TO_TIER[searchResult.searchParams.category] : undefined;
+  const hasRequestedTier = !!searchResult?.proposals.some((p) => p.tier === requestedTier);
+  const [activeTab, setActiveTab] = useState<string>(
+    hasRequestedTier && requestedTier ? requestedTier : "comparativa",
+  );
   const heroImage = useDestinationImage(searchResult?.searchParams.destination ?? "");
 
   if (!searchResult) {
@@ -44,8 +50,10 @@ export function ResultsScreen() {
   }
 
   const { searchParams, proposals } = searchResult;
-  const cheapestTotal = Math.min(...proposals.map((p) => p.economicSummary.total));
+  const hasProposals = proposals.length > 0;
+  const cheapestTotal = hasProposals ? Math.min(...proposals.map((p) => p.economicSummary.total)) : null;
   const activeProposal = proposals.find((p) => p.tier === activeTab);
+  const cheapestEvaluated = state?.generation.metadata.cheapestTotalCost ?? null;
 
   function handleSaveTrip(tier: TierLevel) {
     const proposal = proposals.find((p) => p.tier === tier)!;
@@ -61,11 +69,11 @@ export function ResultsScreen() {
 
   const tabs: TabItem[] = [
     { id: "comparativa", label: "Comparativa", icon: "compass" },
-    ...TIER_ORDER.map((tier) => ({
-      id: tier,
-      label: TIER_THEME[tier].label,
-      activeBgClass: TIER_THEME[tier].solidBg,
-      markerColorClass: TIER_THEME[tier].accentText,
+    ...proposals.map((proposal) => ({
+      id: proposal.tier,
+      label: TIER_THEME[proposal.tier].label,
+      activeBgClass: TIER_THEME[proposal.tier].solidBg,
+      markerColorClass: TIER_THEME[proposal.tier].accentText,
     })),
   ];
 
@@ -95,7 +103,9 @@ export function ResultsScreen() {
             {searchParams.returnDate} · {searchParams.travelers + searchParams.children} viajero
             {searchParams.travelers + searchParams.children > 1 ? "s" : ""}
           </p>
-          <p className="mt-1 text-lg font-semibold lg:text-xl">Propuestas desde {cheapestTotal}€</p>
+          <p className="mt-1 text-lg font-semibold lg:text-xl">
+            {cheapestTotal !== null ? `Propuestas desde ${cheapestTotal}€` : "Sin propuestas para este presupuesto"}
+          </p>
         </div>
       </div>
 
@@ -104,27 +114,61 @@ export function ResultsScreen() {
         <TrailDecoration side="right" />
 
         <div className="relative mx-auto w-full max-w-6xl px-4 py-4">
-          <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
-
-          <div key={activeTab} className="animate-slide-in-trail pb-8">
-            {activeTab === "comparativa" ? (
-              <div className="flex flex-col gap-3">
-                {proposals.map((proposal) => (
-                  <ProposalCompareRow
-                    key={proposal.tier}
-                    proposal={proposal}
-                    onViewDetail={() => setActiveTab(proposal.tier)}
-                  />
-                ))}
+          {!hasProposals ? (
+            <div className="animate-slide-in-trail mx-auto max-w-xl py-10 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sunset-100 text-sunset-600">
+                <Icon name="compass" size={28} />
               </div>
-            ) : activeProposal ? (
-              <ProposalDetailView
-                proposal={activeProposal}
-                searchParams={searchParams}
-                onSave={() => handleSaveTrip(activeProposal.tier)}
-              />
-            ) : null}
-          </div>
+              <h2 className="mt-4 font-heading text-2xl font-bold text-ink-900">
+                No hay ningún viaje que quepa en tu presupuesto
+              </h2>
+              {cheapestEvaluated !== null ? (
+                <p className="mt-2 text-ink-700">
+                  La opción más económica para este viaje son{" "}
+                  <span className="font-bold text-ink-900">{cheapestEvaluated}€</span>,{" "}
+                  {cheapestEvaluated - searchParams.budget}€ por encima de tus {searchParams.budget}€.
+                </p>
+              ) : (
+                <p className="mt-2 text-ink-700">
+                  No se ha encontrado ninguna combinación de vuelo y alojamiento para estas fechas.
+                </p>
+              )}
+              <p className="mt-2 text-sm text-ink-500">
+                Prueba a subir el presupuesto, acortar el viaje o cambiar las fechas.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="mt-6 rounded-full bg-ink-900 px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
+              >
+                Cambiar la búsqueda
+              </button>
+            </div>
+          ) : (
+            <>
+              <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
+
+              <div key={activeTab} className="animate-slide-in-trail pb-8">
+                {activeTab === "comparativa" ? (
+                  <div className="flex flex-col gap-3">
+                    {proposals.map((proposal) => (
+                      <ProposalCompareRow
+                        key={proposal.tier}
+                        proposal={proposal}
+                        onViewDetail={() => setActiveTab(proposal.tier)}
+                      />
+                    ))}
+                  </div>
+                ) : activeProposal ? (
+                  <ProposalDetailView
+                    proposal={activeProposal}
+                    searchParams={searchParams}
+                    onSave={() => handleSaveTrip(activeProposal.tier)}
+                  />
+                ) : null}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -10,7 +10,10 @@ export function isFieldEdited(day: ItineraryDay, field: DayTextField): boolean {
   return day.edits?.[field] !== undefined;
 }
 
-export function getEffectiveRestaurant(day: ItineraryDay): Restaurant {
+// undefined cuando el día viene del motor del backend, que programa comidas
+// con hora y coste pero no conoce el local (ver ItineraryDay.meals).
+export function getEffectiveRestaurant(day: ItineraryDay): Restaurant | undefined {
+  if (!day.restaurant) return undefined;
   const overrides = day.edits?.restaurant;
   return overrides ? { ...day.restaurant, ...overrides } : day.restaurant;
 }
@@ -42,10 +45,12 @@ export function setRestaurantEdit(
   day: ItineraryDay,
   values: Pick<Restaurant, "name" | "description" | "area">,
 ): ItineraryDay {
+  if (!day.restaurant) return day;
+  const original = day.restaurant;
   const overrides: Partial<Omit<Restaurant, "tier">> = {};
   (Object.keys(values) as (keyof typeof values)[]).forEach((key) => {
     const value = values[key].trim();
-    if (value !== "" && value !== day.restaurant[key]) {
+    if (value !== "" && value !== original[key]) {
       overrides[key] = value;
     }
   });
