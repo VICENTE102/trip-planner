@@ -61,19 +61,63 @@ function round2(value: number): number {
 // solo sube en el ranking si el usuario puso beach > 0, y sube más cuanto
 // mayor sea ese nivel — exactamente el efecto que pide la sección 6.1.
 //
-// No hay todavía un planificador de itinerario real (Fase 10): mientras
-// tanto, cada combinación se queda con las actividades más afines (aprox.
-// 2 por día), suficientes para estimar activityCost y la afinidad de
-// preferencias de la combinación.
+// El reparto es por cupos proporcionales al peso de cada preferencia, no un
+// "coger los N mejores" a secas. Ordenar y cortar parecía equivalente
+// mientras las actividades venían del mock, que solo tenía dos plantillas
+// por temática: nunca había suficientes de una sola para copar la lista.
+//
+// Con sitios reales sí las hay. Roma tiene catorce actividades de cultura
+// pura, así que quien pidiera cultura 3 y gastronomía 2 se llevaba diez
+// museos e iglesias y CERO gastronomía: el perfil agregado de la
+// combinación quedaba con gastronomy 0, su preferenceMatch caía por debajo
+// del mínimo de la sección 10.4 y se descartaban todas las combinaciones.
+// Un viaje de cinco días con diez museos tampoco es lo que pidió, aunque
+// hubiera pasado el umbral.
+//
+// Reparte primero un cupo por preferencia (proporcional a su peso, mínimo
+// uno) y solo después rellena lo que falte con las mejor puntuadas. Las
+// preferencias con peso 0 no reciben cupo: siguen sin aparecer.
 function selectTopActivities(
   activities: ActivityCandidate[],
   preferences: PreferenceProfile,
   days: number,
 ): ActivityCandidate[] {
   const count = Math.min(activities.length, Math.max(MIN_ACTIVITIES_PER_COMBINATION, days * ACTIVITIES_PER_DAY));
-  return [...activities]
-    .sort((a, b) => calculatePreferenceScore(preferences, b.profile) - calculatePreferenceScore(preferences, a.profile))
-    .slice(0, count);
+  const byAffinity = [...activities].sort(
+    (a, b) => calculatePreferenceScore(preferences, b.profile) - calculatePreferenceScore(preferences, a.profile),
+  );
+
+  const wanted = ALL_PREFERENCES.filter((key) => preferences[key] > 0);
+  const totalWeight = wanted.reduce((sum, key) => sum + preferences[key], 0);
+  if (totalWeight === 0) {
+    return byAffinity.slice(0, count);
+  }
+
+  const selected: ActivityCandidate[] = [];
+  const taken = new Set<string>();
+
+  // De más peso a menos: si al redondear los cupos sobran plazas, se las
+  // queda lo que el usuario ha pedido con más fuerza.
+  for (const key of [...wanted].sort((a, b) => preferences[b] - preferences[a])) {
+    const quota = Math.max(1, Math.round((count * preferences[key]) / totalWeight));
+    let used = 0;
+    for (const activity of byAffinity) {
+      if (used >= quota || selected.length >= count) break;
+      if (taken.has(activity.id) || activity.profile[key] === 0) continue;
+      taken.add(activity.id);
+      selected.push(activity);
+      used++;
+    }
+  }
+
+  for (const activity of byAffinity) {
+    if (selected.length >= count) break;
+    if (taken.has(activity.id)) continue;
+    taken.add(activity.id);
+    selected.push(activity);
+  }
+
+  return selected;
 }
 
 // Sección 6.1: "gastronomía alta -> reservar mayor presupuesto de
