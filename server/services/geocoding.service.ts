@@ -65,7 +65,18 @@ export async function resolveCityCenter(destination: string): Promise<Coordinate
   }
 
   try {
-    const city = await provider.geocodeCity(destination);
+    // Se consulta con el nombre YA normalizado, no con el que escribió el
+    // usuario. Dos razones:
+    //
+    // 1. La clave de caché siempre ha sido la normalizada, así que consultar
+    //    con el texto crudo hacía que "Ámsterdam" y "Amsterdam" compartieran
+    //    fila pudiendo tener coordenadas distintas: ganaba quien buscara
+    //    primero. Consultar por la clave elimina esa incoherencia.
+    // 2. Geoapify resuelve "Ámsterdam" (con tilde) como NUEVA YORK, mientras
+    //    que "amsterdam" da Países Bajos. No es un problema general de
+    //    acentos —"Berlín" y "Núremberg" resuelven bien— pero basta un caso
+    //    para mandar un viaje al continente equivocado.
+    const city = await provider.geocodeCity(key);
     memoryCache.set(key, city ?? null);
     await writeCachedGeocoding({
       destinationKey: key,
