@@ -26,6 +26,35 @@ SQL Editor del proyecto de Supabase. Es idempotente (`create table if not
 exists`), así que se puede volver a ejecutar entero cuando se añadan tablas
 nuevas.
 
+### Puntos de interés (Overture Maps)
+
+Las actividades reales de los itinerarios salen de [Overture Maps](https://overturemaps.org/),
+que **no es una API en vivo**: se publica como GeoParquet en S3 y se consulta
+con DuckDB. Por eso los datos se cargan a mano, desde tu máquina, y Vercel
+solo lee la tabla `places` ya cargada.
+
+```bash
+npm run pois:inspect            # qué categorías tiene Roma y cuáles no mapeamos
+npm run pois:load               # carga los destinos que falten
+npm run pois:load -- --force    # recarga también los ya cargados
+npm run pois:load -- --only=Roma
+```
+
+Los destinos están en `scripts/destinations.ts` (10 de momento); ampliar es
+añadir nombres y volver a ejecutar `pois:load`, que se salta los que ya
+tienen datos. Las bounding boxes se calculan geocodificando cada nombre, así
+que no hay coordenadas escritas a mano.
+
+`pois:inspect` es la herramienta para ampliar `scripts/overture-categories.ts`:
+lista las categorías que aparecen en una ciudad y cuáles se están
+descartando por no estar mapeadas. La documentación de Overture no publica la
+lista completa de categorías, así que el mapa se escribe mirando los datos.
+
+Los sitios son reales; **el precio, la duración y el horario son estimaciones
+por categoría**, porque Overture no publica ninguno de los tres. Esas
+actividades viajan con `verificationStatus: "partial"` y se explica al usuario
+en `/fuentes`.
+
 ## Desarrollo
 
 `npm run dev` levanta el frontend **y** las funciones de `api/` dentro del

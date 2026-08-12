@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { NavBar } from "./components/NavBar";
+import { SiteFooter } from "./components/SiteFooter";
 import { SearchScreen } from "./screens/SearchScreen";
 import { ResultsScreen } from "./screens/ResultsScreen";
 import { MyTripsScreen } from "./screens/MyTripsScreen";
 import { TripDetailScreen } from "./screens/TripDetailScreen";
+import { DataSourcesScreen } from "./screens/DataSourcesScreen";
 
 function App() {
   return (
@@ -16,8 +18,10 @@ function App() {
             <Route path="/results" element={<ResultsScreen />} />
             <Route path="/mis-viajes" element={<MyTripsScreen />} />
             <Route path="/mis-viajes/:tripId" element={<TripDetailScreen />} />
+            <Route path="/fuentes" element={<DataSourcesScreen />} />
           </Routes>
         </main>
+        <SiteFooter />
       </div>
     </BrowserRouter>
   );

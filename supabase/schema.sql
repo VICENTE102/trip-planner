@@ -72,14 +72,54 @@ create table if not exists geocoding_cache (
   created_at timestamptz not null default now()
 );
 
+-- Paso 3: puntos de interés reales de Overture Maps.
+--
+-- No se rellena desde la app: Overture se distribuye como GeoParquet en S3,
+-- no como API en vivo, así que las filas las carga scripts/load-overture-pois.ts
+-- desde tu máquina (ver README). En producción esta tabla solo se lee.
+--
+-- id es el GERS de Overture, que es estable entre releases: recargar una
+-- ciudad actualiza sus filas en vez de duplicarlas.
+--
+-- Se guarda overture_hierarchy además de la categoría para poder cambiar de
+-- opinión sobre el mapeo a preferencias sin volver a descargar nada.
+--
+-- profile / duration_minutes / price_per_person son ESTIMADOS a partir de la
+-- categoría: Overture no publica precios, duraciones ni horarios. Por eso las
+-- actividades que salen de aquí viajan como verificationStatus "partial" y no
+-- "verified" — el sitio es real, lo que cuesta y lo que dura es una
+-- estimación nuestra.
+create table if not exists places (
+  id text primary key,
+  destination_key text not null,
+  name text not null,
+  latitude double precision not null,
+  longitude double precision not null,
+  basic_category text not null,
+  overture_primary text,
+  overture_hierarchy text[],
+  preference text not null,
+  profile jsonb not null,
+  duration_minutes integer not null,
+  price_per_person numeric not null,
+  opening_hours jsonb,
+  confidence real,
+  website text,
+  overture_release text not null,
+  loaded_at timestamptz not null default now()
+);
+
+create index if not exists places_destination_key_idx on places (destination_key);
+
 alter table trip_requests enable row level security;
 alter table trip_proposals enable row level security;
 alter table provider_searches enable row level security;
 alter table geocoding_cache enable row level security;
+alter table places enable row level security;
 
 -- Las claves API nuevas de Supabase (sb_secret_...) no heredan en automático
 -- los privilegios por defecto sobre tablas nuevas del rol service_role, así
 -- que hay que concedérselos explícitamente (RLS activado arriba sigue
 -- bloqueando anon/authenticated; service_role la salta siempre por diseño).
-grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache to service_role;
+grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache, places to service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to service_role;

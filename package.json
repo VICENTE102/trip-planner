@@ -10,7 +10,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "pois:inspect": "node --env-file=.env.local scripts/load-overture-pois.ts --inspect --only=Roma",
+    "pois:load": "node --env-file=.env.local scripts/load-overture-pois.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
@@ -23,6 +25,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@duckdb/node-api": "^1.5.5-r.4",
     "@tailwindcss/vite": "^4.3.3",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^24.13.3",

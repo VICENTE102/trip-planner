@@ -3,7 +3,7 @@ import type { ItineraryDay } from "../types/itinerary.js";
 import type { PreferenceProfile, ProviderSearchLog, TripCombination, TripProposal } from "../types/trip.js";
 import { mockFlightProvider } from "../providers/mock-flight.provider.js";
 import { mockAccommodationProvider } from "../providers/mock-accommodation.provider.js";
-import { mockPlacesProvider } from "../providers/mock-places.provider.js";
+import { placesProvider } from "../providers/places.provider.js";
 import { mockRoutesProvider } from "../providers/mock-routes.provider.js";
 import { buildScoreBreakdown, combineOffers } from "../algorithms/combine-offers.js";
 import { passesQualityThresholds, validateCombination, validateItinerary, repairInvalidItinerary } from "../algorithms/validate-trip.js";
@@ -142,7 +142,7 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
       adults: request.travelers.adults,
       children: request.travelers.children,
     }),
-    mockPlacesProvider.searchActivities({
+    placesProvider.searchActivities({
       destination: request.destination,
       center,
       preferences,
