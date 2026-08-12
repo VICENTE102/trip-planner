@@ -11,23 +11,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 There is no test suite configured in this project.
 
+Environment variables and the Supabase schema are documented in `README.md`. Server-side keys (`SUPABASE_*`, `GEOAPIFY_API_KEY`) must never take the `VITE_` prefix — that prefix is what puts a value in the browser bundle.
+
 ## Architecture
 
-TripPlanner is a fully client-side (no backend) React + TypeScript + Vite trip-planning app. All content — hotels, flights, itineraries, prices — is deterministically generated mock data; there is no real booking API.
+TripPlanner is a React + TypeScript + Vite frontend on top of a Node backend that runs as Vercel functions (`api/` = HTTP handlers, `server/` = all the logic). The backend is what actually plans the trip: budget allocation, scoring, combination filtering and day-by-day scheduling. Hotels, flights and activities are still simulated (`server/mocks/`) behind provider interfaces, so swapping in a real supplier means writing one provider, not touching the engine. There is no booking API — the app links out instead (see "Deep links").
+
+City coordinates are real (Geoapify, see "Geocoding"); everything else about a place is still made up.
+
+`npm run dev` serves the frontend **and** runs the `api/` functions inside the same Vite server (`devApiPlugin` in `vite.config.ts`), so no separate `vercel dev` is needed.
 
 ### Data flow
 
-`SearchScreen` collects a `SearchParams` (origin, destination, dates, budget, travelers, category, preferences) and navigates to `/results` passing it via router state (see `ResultsScreen`, which redirects to `/` if that state is missing — results are never fetched from a URL).
+`SearchScreen` collects a `SearchParams` (origin, destination, dates, budget, travelers, category, preferences) and POSTs it to `/api/trips/generate` via `src/services/trip-api.client.ts`. If that call fails it throws instead of navigating — `/results` has nothing to show without a backend answer. On success it navigates to `/results` passing `{ searchParams, generation }` in router state (`ResultsScreen` redirects to `/` if that state is missing — results are never fetched from a URL).
 
-`ResultsScreen` calls `buildSearchResult` (`src/services/searchService.ts`), which is the central orchestrator: for each of the three tiers (`barato`/`medio`/`caro`) it combines a hotel (`hotelProvider`), flights (`flightProvider`), a generated day-by-day plan (`itineraryBuilder` + `mockContent`), and a cost breakdown (`economicSummary`) into a `TripProposal`. A `SearchResult` is `{ searchParams, proposals: TripProposal[] }` (always all three tiers — the UI's `category` field only controls which tab is pre-selected, via `CATEGORY_TO_TIER` in `ResultsScreen`).
+`server/services/trip-planner.service.ts` is the backend orchestrator: it resolves the city center once, asks the three providers for offers, builds every viable combination, scores and filters them, and returns up to three proposals (`economical`/`recommended`/`comfort`). Fewer than three — or none — is a legitimate outcome when the budget doesn't stretch; `metadata.cheapestTotalCost` is what lets the empty state say how much is missing.
+
+`src/services/tripAdapter.ts` is the **single** translation point between the backend contract (`server/types`: offers, timed blocks, a 7-line budget breakdown) and the view model (`src/types`: morning/afternoon/night, hotel, expense summary). Anything the engine computes but the UI has nowhere to show is dropped there, and it is documented at the top of that file. Keep the translation in that one place rather than teaching components to read the network shape.
 
 Saving a proposal (`useTrips` → `tripStorage`) wraps it with an id/timestamp into a `Trip` and persists it to `localStorage` under the `"trips"` key; `MyTripsScreen`/`TripDetailScreen` read back from there. There is no server sync.
 
 ### Deterministic mock generation
 
-Everything randomized is actually seeded, not random: `hashString` + `createSeededRandom` (mulberry32 PRNG, `src/utils/random.ts`) derive a numeric seed from stable inputs (destination, dates, tier, budget, etc.), so the same search always reproduces the same hotels/flights/itinerary. When adding new generated content, follow this pattern rather than calling `Math.random()` directly — otherwise results won't be stable across re-renders/navigation.
+Everything randomized in `server/mocks/` is seeded, not random: `hashString` + `createSeededRandom` (mulberry32 PRNG, `server/utils/random.ts`) derive a numeric seed from stable inputs (destination, dates, etc.), so the same search always reproduces the same hotels/flights/activities. When adding new generated content, follow this pattern rather than calling `Math.random()` directly.
 
-`itineraryBuilder.ts` builds one `ItineraryDay` per day, picking morning/afternoon activities and a restaurant via `mockContent.ts`. Each activity/restaurant has a stable `id` (e.g. `"cultura"`, `"playa"`, `"llegada"`) which `constants/blockImages.ts` maps to a hand-picked, verified real Wikimedia Commons photo (never illustrations/icons) — themes are reused across tiers/destinations to keep the curated image set small. If you add a new activity id in `mockContent.ts`, add a matching entry in `blockImages.ts` or it will fall back to a generic icon.
+`constants/blockImages.ts` maps a stable activity id (e.g. `"cultura"`, `"playa"`, `"llegada"`) to a hand-picked, verified real Wikimedia Commons photo (never illustrations/icons). The backend does not yet tag activities with a category, so `tripAdapter` passes an empty id and cards currently fall back to a generic icon; adding `category` to `ItineraryItem` is what would light these back up.
+
+### Geocoding
+
+`server/services/geocoding.service.ts` turns a destination name into real coordinates, resolving in this order: process memory → `geocoding_cache` in Supabase → Geoapify → the seeded mock. It never throws: a search must not fail because a geocoder is down, so the worst case degrades to a fake center.
+
+Two rules that are easy to break by accident: only results from a **real** provider are persisted (caching a mock result would pin invented coordinates forever, and setting `GEOAPIFY_API_KEY` later would no longer fix that destination), and network failures are not cached at all (they must be retried). "Not found" **is** cached, as `found = false`.
 
 `services/destinationImage.ts` resolves a hero photo per destination: a curated `CURATED_IMAGES` map first, then (only if `VITE_PEXELS_API_KEY` is set) a live Pexels API search, cached in-memory per city. `normalizeCityName` (`utils/text.ts`) is what both this and `deepLinks.ts` use to key city names, so lookups are accent/case-insensitive.
 
