@@ -1,6 +1,6 @@
 import type { AccommodationOffer, AccommodationSearchRequest } from "../types/accommodation.js";
 import { createSeededRandom, hashString, pick } from "../utils/random.js";
-import { fakeCityCenter, jitterCoordinates } from "../utils/geo.js";
+import { haversineDistanceKm, jitterCoordinates } from "../utils/geo.js";
 
 const NAME_PREFIXES = ["Hotel", "Suites", "Residencia", "Posada", "Hostal", "Apartamentos"];
 const NAME_SUFFIXES = ["Central", "Plaza", "Mirador", "del Puerto", "Real", "Boutique", "Jardín", "Estación"];
@@ -36,7 +36,7 @@ export function generateMockAccommodations(request: AccommodationSearchRequest):
   const count = MIN_OFFERS + Math.floor(countRandom() * (MAX_OFFERS - MIN_OFFERS + 1));
   const nights = nightsBetween(request.checkInDate, request.checkOutDate);
   const travelers = Math.max(1, request.adults + request.children);
-  const center = fakeCityCenter(request.destination);
+  const { center } = request;
 
   const offers: AccommodationOffer[] = [];
   for (let i = 0; i < count; i++) {
@@ -54,7 +54,11 @@ export function generateMockAccommodations(request: AccommodationSearchRequest):
       reviewCount: Math.round(20 + random() * 2000),
       latitude: coordinates.lat,
       longitude: coordinates.lng,
-      distanceToCenterKm: Math.round(random() * 6 * 10) / 10,
+      // Se calcula de verdad desde el centro de la ciudad, en vez de
+      // inventarlo: con `center` ya resuelto, un número aleatorio podía
+      // contradecir a las propias coordenadas del hotel (y al mapa).
+      distanceToCenterKm:
+        Math.round(haversineDistanceKm(center.lat, center.lng, coordinates.lat, coordinates.lng) * 10) / 10,
       breakfastIncluded: random() > 0.5,
       freeCancellation: random() > 0.4,
       amenities: pickAmenities(random),

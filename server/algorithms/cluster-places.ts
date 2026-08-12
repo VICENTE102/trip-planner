@@ -1,4 +1,5 @@
 import type { TravelMatrixEntry } from "../types/route.js";
+import { haversineDistanceKm } from "../utils/geo.js";
 
 export interface ClusterablePlace {
   id: string;
@@ -6,7 +7,6 @@ export interface ClusterablePlace {
   longitude: number;
 }
 
-const EARTH_RADIUS_KM = 6371;
 const WALK_SPEED_KMH = 4.5;
 const TRANSIT_SPEED_KMH = 20;
 // Por debajo de esta distancia se asume que se va andando en vez de en
@@ -14,20 +14,6 @@ const TRANSIT_SPEED_KMH = 20;
 // por distancia en línea recta, no un dato verificado de Google Routes).
 const WALK_THRESHOLD_KM = 1.5;
 const MIN_TRAVEL_MINUTES = 5;
-
-function toRadians(degrees: number): number {
-  return (degrees * Math.PI) / 180;
-}
-
-function haversineDistanceKm(a: ClusterablePlace, b: ClusterablePlace): number {
-  const dLat = toRadians(b.latitude - a.latitude);
-  const dLng = toRadians(b.longitude - a.longitude);
-  const lat1 = toRadians(a.latitude);
-  const lat2 = toRadians(b.latitude);
-
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
 
 // calculateTravelMatrix(): estima tiempos de desplazamiento por distancia
 // en línea recta entre cada par de lugares (hotel + actividades). Es el
@@ -39,7 +25,7 @@ export function calculateTravelMatrix(places: ClusterablePlace[]): TravelMatrixE
   for (const from of places) {
     for (const to of places) {
       if (from.id === to.id) continue;
-      const distanceKm = haversineDistanceKm(from, to);
+      const distanceKm = haversineDistanceKm(from.latitude, from.longitude, to.latitude, to.longitude);
       const transportMode: TravelMatrixEntry["transportMode"] = distanceKm <= WALK_THRESHOLD_KM ? "walk" : "transit";
       const speedKmh = transportMode === "walk" ? WALK_SPEED_KMH : TRANSIT_SPEED_KMH;
       const travelMinutes = Math.max(MIN_TRAVEL_MINUTES, Math.round((distanceKm / speedKmh) * 60));

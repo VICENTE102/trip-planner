@@ -1,5 +1,4 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseConfig } from "../config/env.js";
+import { getSupabaseClient } from "../config/supabase.js";
 import type { ProviderSearchLog, TripProposal } from "../types/trip.js";
 
 export interface StoredTrip {
@@ -7,21 +6,6 @@ export interface StoredTrip {
   request: Record<string, unknown>;
   proposals: TripProposal[];
   createdAt: string;
-}
-
-let client: SupabaseClient | undefined;
-
-function getClient(): SupabaseClient | undefined {
-  const config = getSupabaseConfig();
-  if (!config) {
-    return undefined;
-  }
-  if (!client) {
-    client = createClient(config.url, config.serviceRoleKey, {
-      auth: { persistSession: false },
-    });
-  }
-  return client;
 }
 
 // Fase 11: persistencia best-effort. Si Supabase no está configurado, o si
@@ -34,7 +18,7 @@ export async function persistTripGeneration(params: {
   proposals: TripProposal[];
   providerSearches: ProviderSearchLog[];
 }): Promise<void> {
-  const db = getClient();
+  const db = getSupabaseClient();
   if (!db) {
     console.warn(`[${params.requestId}] Supabase no configurado; se omite la persistencia.`);
     return;
@@ -100,7 +84,7 @@ export async function persistTripGeneration(params: {
 // no solo escribe, sino que lo escrito es legible). Devuelve undefined tanto
 // si Supabase no está configurado como si no existe ese id.
 export async function getStoredTrip(requestId: string): Promise<StoredTrip | undefined> {
-  const db = getClient();
+  const db = getSupabaseClient();
   if (!db) {
     return undefined;
   }

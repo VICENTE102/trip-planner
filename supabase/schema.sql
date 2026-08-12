@@ -44,13 +44,42 @@ create table if not exists provider_searches (
 create index if not exists trip_proposals_trip_request_id_idx on trip_proposals (trip_request_id);
 create index if not exists provider_searches_trip_request_id_idx on provider_searches (trip_request_id);
 
+-- Paso 2: caché de geocodificación. Una ciudad se geocodifica UNA vez en
+-- toda la vida de la app; a partir de ahí se lee de aquí. Las coordenadas
+-- de una ciudad no cambian, así que esta caché no caduca.
+--
+-- destination_key es el nombre normalizado (server/utils/text.ts): sin
+-- acentos, en minúsculas y sin el país, para que "Roma", "roma" y
+-- "Roma, Italia" compartan una única fila.
+--
+-- found = false guarda los "no encontrado": sin eso, un destino mal escrito
+-- preguntaría a Geoapify una vez por búsqueda, para siempre. En esas filas
+-- latitude/longitude van a null, de ahí que sean columnas opcionales.
+--
+-- Solo se guardan aquí resultados de un proveedor real. Los del mock no se
+-- persisten nunca: si se guardasen, una búsqueda hecha sin GEOAPIFY_API_KEY
+-- dejaría coordenadas inventadas clavadas en la caché y configurar la clave
+-- después ya no arreglaría ese destino.
+create table if not exists geocoding_cache (
+  destination_key text primary key,
+  destination_input text not null,
+  latitude double precision,
+  longitude double precision,
+  formatted_name text,
+  country_code text,
+  found boolean not null,
+  provider text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table trip_requests enable row level security;
 alter table trip_proposals enable row level security;
 alter table provider_searches enable row level security;
+alter table geocoding_cache enable row level security;
 
 -- Las claves API nuevas de Supabase (sb_secret_...) no heredan en automático
 -- los privilegios por defecto sobre tablas nuevas del rol service_role, así
 -- que hay que concedérselos explícitamente (RLS activado arriba sigue
 -- bloqueando anon/authenticated; service_role la salta siempre por diseño).
-grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches to service_role;
+grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache to service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to service_role;

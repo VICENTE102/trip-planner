@@ -1,3 +1,5 @@
+import type { Coordinates } from "./geocoding.js";
+
 export interface AccommodationOffer {
   id: string;
   provider: string;
@@ -19,6 +21,11 @@ export interface AccommodationOffer {
 
 export interface AccommodationSearchRequest {
   destination: string;
+  // Centro de la ciudad ya resuelto por quien orquesta la búsqueda
+  // (trip-planner.service.ts), no por el proveedor: geocodificar es una
+  // llamada de red, y así se hace UNA vez por viaje en lugar de una por
+  // cada proveedor que necesite saber dónde está la ciudad.
+  center: Coordinates;
   checkInDate: string;
   checkOutDate: string;
   adults: number;

@@ -1,4 +1,5 @@
 import type { PreferenceProfile } from "./trip.js";
+import type { Coordinates } from "./geocoding.js";
 
 export interface OpeningPeriod {
   dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -24,6 +25,9 @@ export interface ActivityCandidate {
 
 export interface ActivitySearchRequest {
   destination: string;
+  // Ver AccommodationSearchRequest.center: lo resuelve el orquestador una
+  // sola vez y se lo pasa a los dos proveedores.
+  center: Coordinates;
   preferences: PreferenceProfile;
 }
 

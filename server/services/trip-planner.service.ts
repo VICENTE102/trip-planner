@@ -11,6 +11,7 @@ import { filterDominatedOptions } from "../algorithms/pareto-filter.js";
 import { selectDiverseProposals } from "../algorithms/select-proposals.js";
 import { buildTravelMatrixLookup } from "../algorithms/cluster-places.js";
 import { distributePlacesAcrossDays, scheduleDayActivities } from "../algorithms/schedule-itinerary.js";
+import { resolveCityCenter } from "./geocoding.service.js";
 
 export interface GenerateTripResult {
   proposals: TripProposal[];
@@ -116,6 +117,14 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
   // — este cast solo alinea el tipo con esa garantía ya comprobada.
   const preferences = request.preferences as PreferenceProfile;
 
+  // Paso 2: el centro real del destino se resuelve UNA vez por viaje
+  // generado y se reparte a los proveedores que lo necesitan. Si cada
+  // proveedor geocodificase por su cuenta, la misma ciudad se consultaría
+  // dos veces por búsqueda. Va antes del Promise.all porque ambas búsquedas
+  // dependen de él; los vuelos no, pero paralelizarlos por separado no
+  // compensa la complejidad cuando la caché resuelve esto en milisegundos.
+  const center = await resolveCityCenter(request.destination);
+
   const [flights, accommodations, activities] = await Promise.all([
     mockFlightProvider.searchFlights({
       origin: request.origin,
@@ -127,6 +136,7 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     }),
     mockAccommodationProvider.searchAccommodations({
       destination: request.destination,
+      center,
       checkInDate: departureDateIso,
       checkOutDate: returnDateIso,
       adults: request.travelers.adults,
@@ -134,6 +144,7 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     }),
     mockPlacesProvider.searchActivities({
       destination: request.destination,
+      center,
       preferences,
     }),
   ]);

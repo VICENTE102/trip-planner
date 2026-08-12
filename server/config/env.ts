@@ -18,3 +18,12 @@ export function getSupabaseConfig(): SupabaseConfig | undefined {
 
   return { url, serviceRoleKey };
 }
+
+// Paso 2: misma política que las claves de Supabase — GEOAPIFY_API_KEY es una
+// variable de entorno del servidor, sin prefijo VITE_, y las llamadas a
+// Geoapify salen siempre desde api/ (nunca desde el navegador). Sin ella, la
+// geocodificación cae al MockGeocodingProvider y la app sigue funcionando.
+export function getGeoapifyApiKey(): string | undefined {
+  const apiKey = process.env.GEOAPIFY_API_KEY;
+  return apiKey && apiKey.trim() !== "" ? apiKey.trim() : undefined;
+}

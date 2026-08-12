@@ -1,7 +1,7 @@
 import type { ActivityCandidate, ActivitySearchRequest, OpeningPeriod } from "../types/activity.js";
 import type { PreferenceLevel, PreferenceProfile, TravelPreference } from "../types/trip.js";
 import { createSeededRandom, hashString, pick } from "../utils/random.js";
-import { fakeCityCenter, jitterCoordinates } from "../utils/geo.js";
+import { jitterCoordinates } from "../utils/geo.js";
 
 interface ActivityTemplate {
   name: string;
@@ -86,7 +86,7 @@ export function generateMockActivities(request: ActivitySearchRequest): Activity
   const seed = hashString(`activities-${request.destination}`);
   const countRandom = createSeededRandom(seed);
   const count = MIN_ACTIVITIES + Math.floor(countRandom() * (MAX_ACTIVITIES - MIN_ACTIVITIES + 1));
-  const center = fakeCityCenter(request.destination);
+  const { center } = request;
   const templateSequence = buildTemplateSequence(count, seed);
 
   const activities: ActivityCandidate[] = [];
