@@ -55,6 +55,22 @@ por categoría**, porque Overture no publica ninguno de los tres. Esas
 actividades viajan con `verificationStatus: "partial"` y se explica al usuario
 en `/fuentes`.
 
+### Mapa
+
+MapLibre GL JS con teselas de [OpenFreeMap](https://openfreemap.org/): sin
+clave, sin registro, sin límites declarados y con uso comercial permitido. La
+URL del estilo y la atribución están en `src/constants/mapStyle.ts`, en una
+sola constante, para que cambiar de proveedor sea una línea — el servicio lo
+mantiene una persona con donaciones y no ofrece SLA. La alternativa anotada es
+[Maptoolkit](https://www.maptoolkit.org/).
+
+El estilo de OpenFreeMap **no declara `attribution` en sus fuentes**, así que
+el control de atribución de MapLibre se rellena a mano desde esa constante. No
+es opcional: la ODbL de OpenStreetMap exige el aviso de autoría.
+
+MapLibre se carga con `import()` (`DayMapLazy.tsx`) para mantenerlo fuera del
+bundle principal, igual que el generador de PDF.
+
 ## Desarrollo
 
 `npm run dev` levanta el frontend **y** las funciones de `api/` dentro del

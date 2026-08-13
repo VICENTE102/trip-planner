@@ -32,6 +32,11 @@ interface DayCardProps {
   imageOnRight?: boolean;
   editable?: boolean;
   onUpdateDay?: (day: ItineraryDay) => void;
+  // Clases extra sobre la raíz de la tarjeta. Existe para que quien la
+  // coloca pueda animarla sin envolverla en otro div: la tarjeta es hija
+  // directa de una rejilla con `items-stretch` y un envoltorio de más le
+  // quitaría el estirado a la altura del mapa.
+  className?: string;
 }
 
 type EditingField = DayTextField | "restaurant" | null;
@@ -290,6 +295,7 @@ export function DayCard({
   imageOnRight = day.dayNumber % 2 === 0,
   editable = false,
   onUpdateDay,
+  className = "",
 }: DayCardProps) {
   const theme = TIER_THEME[tier];
   const [editingField, setEditingField] = useState<EditingField>(null);
@@ -324,7 +330,7 @@ export function DayCard({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
+    <div className={`overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm ${className}`}>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-baseline gap-2">

@@ -22,9 +22,23 @@ const SOURCES: DataSource[] = [
   {
     name: "OpenStreetMap",
     url: "https://www.openstreetmap.org/copyright",
-    what: "Las coordenadas de cada ciudad, a través del servicio de geocodificación de Geoapify.",
+    what: "La base de todo el mapa y las coordenadas de cada ciudad, estas últimas a través del servicio de geocodificación de Geoapify.",
     license: "Open Database License (ODbL)",
     notice: "© OpenStreetMap contributors",
+  },
+  {
+    name: "OpenFreeMap",
+    url: "https://openfreemap.org/",
+    what: "Sirve las teselas del mapa del itinerario, sin clave ni límites de uso.",
+    license: "Proyecto de código abierto (MIT), datos de OpenMapTiles y OpenStreetMap",
+    notice: "OpenFreeMap © OpenMapTiles",
+  },
+  {
+    name: "OpenMapTiles",
+    url: "https://openmaptiles.org/",
+    what: "El esquema y el estilo de las teselas vectoriales que dibuja el mapa.",
+    license: "Datos derivados de OpenStreetMap (ODbL)",
+    notice: "© OpenMapTiles",
   },
   {
     name: "Geoapify",

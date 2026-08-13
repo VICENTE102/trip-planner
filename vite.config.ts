@@ -130,5 +130,13 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss(), devApiPlugin(env)],
+    // maplibre-gl arranca un web worker para descodificar teselas. Al pasar
+    // por el pre-bundling de dependencias de Vite en desarrollo, ese worker
+    // no llega a funcionar: el mapa pinta el primer fotograma pero ninguna
+    // fuente termina de cargar, `load` no se dispara nunca y no hay forma de
+    // añadirle capas ni marcadores. Se comprobó que le pasa igual a un mapa
+    // mínimo creado a mano con un estilo raster, así que no es cosa de
+    // nuestro componente. Excluyéndolo, Vite lo sirve tal cual.
+    optimizeDeps: { exclude: ['maplibre-gl'] },
   }
 })

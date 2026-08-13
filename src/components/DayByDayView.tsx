@@ -4,7 +4,7 @@ import { TIER_THEME } from "../constants/tierTheme";
 import { Tabs } from "./Tabs";
 import type { TabItem } from "./Tabs";
 import { DayCard } from "./DayCard";
-import { DayMap } from "./DayMap";
+import { DayMapLazy } from "./DayMapLazy";
 
 interface DayByDayViewProps {
   itinerary: Itinerary;
@@ -34,8 +34,17 @@ export function DayByDayView({ itinerary, searchParams, tier, editable, onUpdate
         onChange={(id) => setSelectedDayNumber(Number(id))}
       />
 
-      <div key={selectedDayNumber} className="grid animate-slide-in-trail gap-4 lg:grid-cols-2 lg:items-stretch">
+      {/* El `key` va en la tarjeta, no en la rejilla. Estando en la rejilla,
+          React desmontaba y volvía a montar TODO el subárbol en cada cambio
+          de día, mapa incluido: con MapLibre eso significa recrear el
+          contexto WebGL y volver a descargar el estilo cada vez que se pulsa
+          un número. Ahora solo se reinicia la animación de la tarjeta y el
+          mapa sobrevive, que es lo que le permite reencuadrar en vez de
+          parpadear. */}
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
         <DayCard
+          key={selectedDayNumber}
+          className="animate-slide-in-trail"
           day={selectedDay}
           searchParams={searchParams}
           tier={tier}
@@ -43,7 +52,7 @@ export function DayByDayView({ itinerary, searchParams, tier, editable, onUpdate
           editable={editable}
           onUpdateDay={onUpdateDay}
         />
-        <DayMap stops={selectedDay.stops} tier={tier} />
+        <DayMapLazy stops={selectedDay.stops} tier={tier} />
       </div>
     </div>
   );
