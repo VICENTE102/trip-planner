@@ -1,0 +1,34 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Comprobación de tipos
+        run: npx tsc -b
+
+      # Sin secretos a propósito: la suite se resuelve entera con los
+      # proveedores simulados (geocodificación al mock determinista,
+      # actividades al MockPlacesProvider, persistencia a no-op), así que no
+      # sale a la red ni necesita claves. Las pruebas de integración contra
+      # Geoapify se lanzan a mano con `npm run test:integration`.
+      - name: Pruebas
+        run: npm test

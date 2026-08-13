@@ -8,8 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` — type-check (`tsc -b`) then build with Vite
 - `npm run lint` — run Oxlint
 - `npm run preview` — preview the production build
+- `npm test` — run the Vitest suite (`npm run test:watch` to keep it running)
+- `npm run test:integration` — hit Geoapify for real; needs `GEOAPIFY_API_KEY`
 
-There is no test suite configured in this project.
+Tests live next to the code they cover (`schedule-itinerary.test.ts` beside `schedule-itinerary.ts`) and only cover `server/` and `api/` — there are no React component tests, on purpose. `.github/workflows/test.yml` runs lint, `tsc -b` and the suite on every push.
+
+The whole suite runs offline with no keys: without `SUPABASE_URL` and `GEOAPIFY_API_KEY` the chain degrades to the seeded mocks (geocoding → `MockGeocodingProvider`, activities → `MockPlacesProvider`, persistence → no-op), so a full `/api/trips/generate` call is deterministic and hermetic. Keep it that way — a test that needs the network belongs in `*.integration.test.ts`, which is excluded from `npm test` by a separate Vitest config.
 
 Environment variables and the Supabase schema are documented in `README.md`. Server-side keys (`SUPABASE_*`, `GEOAPIFY_API_KEY`) must never take the `VITE_` prefix — that prefix is what puts a value in the browser bundle.
 

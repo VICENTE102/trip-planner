@@ -71,6 +71,25 @@ es opcional: la ODbL de OpenStreetMap exige el aviso de autoría.
 MapLibre se carga con `import()` (`DayMapLazy.tsx`) para mantenerlo fuera del
 bundle principal, igual que el generador de PDF.
 
+## Pruebas
+
+```bash
+npm test                 # suite completa, sin red ni claves
+npm run test:watch       # en modo vigilancia mientras desarrollas
+npm run test:integration # contra Geoapify de verdad (necesita GEOAPIFY_API_KEY)
+```
+
+Las pruebas viven junto al código que comprueban y cubren solo el backend
+(`server/` y `api/`). Se ejecutan solas en cada push mediante GitHub Actions.
+
+`npm test` **no sale a la red ni necesita ninguna clave**: sin `SUPABASE_URL`
+ni `GEOAPIFY_API_KEY`, la cadena se resuelve con los proveedores simulados,
+que van sembrados y por tanto dan siempre el mismo resultado.
+
+`npm run test:integration` es otra cosa: comprueba que las 10 ciudades
+cargadas siguen geocodificando donde deben. Queda fuera de CI porque depende
+de un servicio ajeno, pero conviene lanzarla al añadir destinos nuevos.
+
 ## Desarrollo
 
 `npm run dev` levanta el frontend **y** las funciones de `api/` dentro del

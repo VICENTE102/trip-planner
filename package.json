@@ -12,7 +12,10 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "pois:inspect": "node --env-file=.env.local scripts/load-overture-pois.ts --inspect --only=Roma",
-    "pois:load": "node --env-file=.env.local scripts/load-overture-pois.ts"
+    "pois:load": "node --env-file=.env.local scripts/load-overture-pois.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "node --env-file-if-exists=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
@@ -34,6 +37,7 @@
     "oxlint": "^1.75.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
   }
 }
