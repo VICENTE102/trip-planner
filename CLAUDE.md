@@ -45,6 +45,14 @@ What travels to the UI is the **preference**, not the provider's `category`: the
 
 Photos are **per theme, not per place**: every museum in every city shares one photo. That keeps image API calls at zero, but reads odd now that places are real (the Museo Nazionale Etrusco under an aerial shot of Lübeck). Fixing it means a paid image search — the `website` column already stored for each Overture place is the likelier starting point.
 
+### Travel times
+
+`server/services/routes.service.ts` resolves the walking matrix between the hotels and the selected activities: `routes_cache` in Supabase → one OpenRouteService matrix → the haversine estimate. It never throws, same as geocoding.
+
+Two things worth knowing before touching it. **One matrix per search, not one per proposal**: `combineOffers` picks the activities once outside its loops, so every combination shares the identical activity list and only the hotel differs — the matrix is therefore hoisted into `generateTripProposals` and passed down. And **ORS has no public transport** on its public API (car, bike, foot, wheelchair), so anything above `WALK_CAP_MINUTES` is estimated as `transit` rather than proposing a 90-minute walk. That estimate runs on the **real street distance ORS just returned** plus a fixed access allowance — not on the straight line, which put the Colosseum 10 minutes from St. Peter's when walking it takes 49. If the estimate comes out worse than walking, walking wins.
+
+Cache keys round coordinates to 5 decimals (~1 m) and include the direction: A→B and B→A are separate rows.
+
 ### Geocoding
 
 `server/services/geocoding.service.ts` turns a destination name into real coordinates, resolving in this order: process memory → `geocoding_cache` in Supabase → Geoapify → the seeded mock. It never throws: a search must not fail because a geocoder is down, so the worst case degrades to a fake center.

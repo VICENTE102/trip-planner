@@ -14,6 +14,7 @@ Vite no las incluye en el bundle y nunca llegan al navegador. En local van en
 | `SUPABASE_URL` | Persistencia de viajes y caché | Se omite el guardado; los viajes se generan igual |
 | `SUPABASE_SERVICE_ROLE_KEY` | Ídem | Ídem |
 | `GEOAPIFY_API_KEY` | Geocodificar el destino (coordenadas reales) | Se usan coordenadas simuladas (`MockGeocodingProvider`) |
+| `ORS_API_KEY` | Tiempos de desplazamiento a pie reales (OpenRouteService) | Se estiman en línea recta, como antes del Paso 5 |
 
 `VITE_PEXELS_API_KEY` es la excepción y sí es pública a propósito: la búsqueda
 de la foto de portada la hace el navegador. Es opcional; sin ella se usan las
@@ -71,24 +72,47 @@ es opcional: la ODbL de OpenStreetMap exige el aviso de autoría.
 MapLibre se carga con `import()` (`DayMapLazy.tsx`) para mantenerlo fuera del
 bundle principal, igual que el generador de PDF.
 
+### Tiempos de desplazamiento
+
+Los trayectos **a pie** entre paradas los calcula
+[OpenRouteService](https://openrouteservice.org/) con calles reales, en vez de
+la línea recta de antes. Se pide **una sola matriz por búsqueda** (todos los
+hoteles candidatos y todas las actividades a la vez) y se cachea por par de
+coordenadas en `routes_cache`, así que en régimen normal la mayoría de
+búsquedas no llaman a la API.
+
+**Lo que NO es real: el transporte público.** La API pública de ORS no lo
+cubre (sus perfiles son coche, bici, a pie y silla de ruedas). Por encima de
+45 minutos andando el trayecto se marca como `transit` y se estima, porque
+proponer una caminata de hora y media entre dos museos sería peor.
+
+Esa estimación se calcula sobre la **distancia real por calle** que acaba de
+dar ORS, más unos minutos de acceso a la parada — no sobre la línea recta.
+Con la línea recta a 20 km/h, el Coliseo y la Basílica de San Pedro salían a
+10 minutos cuando andando son 49. Y si la estimación sale peor que ir
+andando, se anda: es una opción real y es el dato que sí conocemos.
+
 ## Pruebas
 
 ```bash
 npm test                 # suite completa, sin red ni claves
 npm run test:watch       # en modo vigilancia mientras desarrollas
-npm run test:integration # contra Geoapify de verdad (necesita GEOAPIFY_API_KEY)
+npm run test:integration # contra Geoapify y ORS de verdad (necesita sus claves)
 ```
 
 Las pruebas viven junto al código que comprueban y cubren solo el backend
 (`server/` y `api/`). Se ejecutan solas en cada push mediante GitHub Actions.
 
-`npm test` **no sale a la red ni necesita ninguna clave**: sin `SUPABASE_URL`
-ni `GEOAPIFY_API_KEY`, la cadena se resuelve con los proveedores simulados,
-que van sembrados y por tanto dan siempre el mismo resultado.
+`npm test` **no sale a la red ni necesita ninguna clave**: sin `SUPABASE_URL`,
+`GEOAPIFY_API_KEY` ni `ORS_API_KEY`, la cadena se resuelve con los proveedores
+simulados, que van sembrados y por tanto dan siempre el mismo resultado. Hay
+una prueba que lo vigila contando las llamadas a `fetch` de una generación
+completa.
 
 `npm run test:integration` es otra cosa: comprueba que las 10 ciudades
-cargadas siguen geocodificando donde deben. Queda fuera de CI porque depende
-de un servicio ajeno, pero conviene lanzarla al añadir destinos nuevos.
+cargadas siguen geocodificando donde deben y que los tiempos a pie de ORS son
+creíbles. Queda fuera de CI porque depende de servicios ajenos, pero conviene
+lanzarla al añadir destinos nuevos.
 
 ## Desarrollo
 

@@ -27,3 +27,11 @@ export function getGeoapifyApiKey(): string | undefined {
   const apiKey = process.env.GEOAPIFY_API_KEY;
   return apiKey && apiKey.trim() !== "" ? apiKey.trim() : undefined;
 }
+
+// Paso 5: misma política que las anteriores — variable de servidor, sin
+// prefijo VITE_, y la llamada sale de api/. Sin ella los tiempos de
+// desplazamiento se estiman en línea recta, como antes del Paso 5.
+export function getOpenRouteServiceApiKey(): string | undefined {
+  const apiKey = process.env.ORS_API_KEY;
+  return apiKey && apiKey.trim() !== "" ? apiKey.trim() : undefined;
+}

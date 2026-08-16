@@ -4,7 +4,6 @@ import type { PreferenceProfile, ProviderSearchLog, TripCombination, TripProposa
 import { mockFlightProvider } from "../providers/mock-flight.provider.js";
 import { mockAccommodationProvider } from "../providers/mock-accommodation.provider.js";
 import { placesProvider } from "../providers/places.provider.js";
-import { mockRoutesProvider } from "../providers/mock-routes.provider.js";
 import { buildScoreBreakdown, combineOffers } from "../algorithms/combine-offers.js";
 import { passesQualityThresholds, validateCombination, validateItinerary, repairInvalidItinerary } from "../algorithms/validate-trip.js";
 import { filterDominatedOptions } from "../algorithms/pareto-filter.js";
@@ -12,6 +11,7 @@ import { selectDiverseProposals } from "../algorithms/select-proposals.js";
 import { buildTravelMatrixLookup } from "../algorithms/cluster-places.js";
 import { distributePlacesAcrossDays, scheduleDayActivities } from "../algorithms/schedule-itinerary.js";
 import { resolveCityCenter } from "./geocoding.service.js";
+import { resolveTravelMatrix } from "./routes.service.js";
 
 export interface GenerateTripResult {
   proposals: TripProposal[];
@@ -53,7 +53,12 @@ function addDaysIso(dateIso: string, daysToAdd: number): string {
 // las decenas o cientos de candidatas evaluadas.
 async function buildItineraryForCombination(
   combination: TripCombination,
-  context: { days: number; departureDateIso: string; preferences: PreferenceProfile },
+  context: {
+    days: number;
+    departureDateIso: string;
+    preferences: PreferenceProfile;
+    travelMinutes: (fromId: string, toId: string) => number;
+  },
 ): Promise<ItineraryDay[]> {
   const hotel = {
     id: combination.accommodation.id,
@@ -62,18 +67,7 @@ async function buildItineraryForCombination(
     longitude: combination.accommodation.longitude,
   };
 
-  const places = [
-    hotel,
-    ...combination.activities.map((activity) => ({
-      id: activity.id,
-      latitude: activity.latitude,
-      longitude: activity.longitude,
-    })),
-  ];
-  const travelMatrix = await mockRoutesProvider.calculateTravelMatrix(places);
-  const travelLookup = buildTravelMatrixLookup(travelMatrix);
-  const travelMinutes = (fromId: string, toId: string) => travelLookup.get(`${fromId}->${toId}`)?.travelMinutes ?? 0;
-
+  const travelMinutes = context.travelMinutes;
   const allocations = distributePlacesAcrossDays(combination.activities, context.days, context.preferences);
   const outboundArrival = combination.flight.outbound[combination.flight.outbound.length - 1].arrivalTime;
   const inboundDeparture = combination.flight.inbound?.[0]?.departureTime;
@@ -182,13 +176,51 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
   const nonDominated = filterDominatedOptions(validScored, (s) => s.scoreBreakdown);
   const discardedCombinations = combinations.length - nonDominated.length;
 
+  // Una sola matriz de desplazamientos para TODAS las propuestas.
+  //
+  // combineOffers() selecciona las actividades una vez, fuera de sus bucles,
+  // así que todas las combinaciones comparten exactamente la misma lista: lo
+  // único que cambia entre propuestas es el hotel. Calcular la matriz dentro
+  // de cada itinerario repetía tres veces el mismo trabajo, que con
+  // OpenRouteService serían tres llamadas de red en lugar de una.
+  //
+  // Se piden los hoteles de las candidatas que pueden acabar siendo
+  // propuesta, no los de las cientos de combinaciones evaluadas.
+  const activityPlaces = (nonDominated[0]?.combination.activities ?? []).map((activity) => ({
+    id: activity.id,
+    latitude: activity.latitude,
+    longitude: activity.longitude,
+  }));
+  // Se acotan los hoteles porque la matriz tiene un máximo de puntos y
+  // nonDominated puede traer bastantes. De estos solo tres acaban siendo
+  // propuesta; si alguno se quedara fuera del recorte, sus desplazamientos
+  // se estiman en línea recta, que es el comportamiento de siempre.
+  const MAX_HOTELS_IN_MATRIX = 20;
+  const hotelPlaces = [
+    ...new Map(
+      nonDominated.map(({ combination }) => [
+        combination.accommodation.id,
+        {
+          id: combination.accommodation.id,
+          latitude: combination.accommodation.latitude,
+          longitude: combination.accommodation.longitude,
+        },
+      ]),
+    ).values(),
+  ].slice(0, MAX_HOTELS_IN_MATRIX);
+
+  const travelMatrix = await resolveTravelMatrix([...hotelPlaces, ...activityPlaces]);
+  const travelLookup = buildTravelMatrixLookup(travelMatrix);
+  const travelMinutes = (fromId: string, toId: string) => travelLookup.get(`${fromId}->${toId}`)?.travelMinutes ?? 0;
+
   const proposals = await selectDiverseProposals(nonDominated, {
     userBudget: request.budget,
     travelers,
     preferences,
     evaluatedCombinations: combinations.length,
     discardedCombinations,
-    buildItinerary: (combination) => buildItineraryForCombination(combination, { days, departureDateIso, preferences }),
+    buildItinerary: (combination) =>
+      buildItineraryForCombination(combination, { days, departureDateIso, preferences, travelMinutes }),
   });
 
   const cheapestTotalCost = combinations.length

@@ -111,15 +111,42 @@ create table if not exists places (
 
 create index if not exists places_destination_key_idx on places (destination_key);
 
+-- Paso 5: caché de tiempos de desplazamiento reales (OpenRouteService).
+--
+-- La clave es el par de coordenadas redondeado a 5 decimales (~1 m) más el
+-- perfil de ruta. Se redondea porque Overture da 7 decimales: sin eso, dos
+-- referencias al mismo sitio generarían dos filas distintas y la caché no
+-- acertaría nunca.
+--
+-- El sentido importa: from -> to no es lo mismo que to -> from (calles de
+-- un solo sentido, cuestas), así que cada dirección tiene su fila.
+--
+-- Solo se guardan tiempos de un proveedor real. Los del mock (haversine) no
+-- se persisten: dejarían estimaciones clavadas para siempre y configurar
+-- ORS_API_KEY después ya no arreglaría ese par.
+create table if not exists routes_cache (
+  route_key text primary key,
+  profile text not null,
+  from_lat double precision not null,
+  from_lng double precision not null,
+  to_lat double precision not null,
+  to_lng double precision not null,
+  duration_seconds double precision not null,
+  distance_km double precision not null,
+  provider text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table trip_requests enable row level security;
 alter table trip_proposals enable row level security;
 alter table provider_searches enable row level security;
 alter table geocoding_cache enable row level security;
 alter table places enable row level security;
+alter table routes_cache enable row level security;
 
 -- Las claves API nuevas de Supabase (sb_secret_...) no heredan en automático
 -- los privilegios por defecto sobre tablas nuevas del rol service_role, así
 -- que hay que concedérselos explícitamente (RLS activado arriba sigue
 -- bloqueando anon/authenticated; service_role la salta siempre por diseño).
-grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache, places to service_role;
+grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache, places, routes_cache to service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to service_role;

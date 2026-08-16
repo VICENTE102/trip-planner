@@ -58,6 +58,22 @@ describe("POST /api/trips/generate", () => {
     vi.stubEnv("SUPABASE_URL", "");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
     vi.stubEnv("GEOAPIFY_API_KEY", "");
+    vi.stubEnv("ORS_API_KEY", "");
+  });
+
+  // La suite tiene que seguir siendo hermética: si alguna clave se colara,
+  // CI empezaría a depender de servicios externos y a fallar por caídas
+  // ajenas. Esta prueba vigila que una generación completa no toque la red.
+  it("no sale a la red en ningún momento", async () => {
+    let llamadas = 0;
+    vi.stubGlobal("fetch", async () => {
+      llamadas++;
+      return new Response("{}", { status: 200 });
+    });
+
+    await generar(PETICION);
+    expect(llamadas).toBe(0);
+    vi.unstubAllGlobals();
   });
 
   it("devuelve 201 y hasta tres propuestas", async () => {
