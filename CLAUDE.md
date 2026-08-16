@@ -39,7 +39,11 @@ Saving a proposal (`useTrips` → `tripStorage`) wraps it with an id/timestamp i
 
 Everything randomized in `server/mocks/` is seeded, not random: `hashString` + `createSeededRandom` (mulberry32 PRNG, `server/utils/random.ts`) derive a numeric seed from stable inputs (destination, dates, etc.), so the same search always reproduces the same hotels/flights/activities. When adding new generated content, follow this pattern rather than calling `Math.random()` directly.
 
-`constants/blockImages.ts` maps a stable activity id (e.g. `"cultura"`, `"playa"`, `"llegada"`) to a hand-picked, verified real Wikimedia Commons photo (never illustrations/icons). The backend does not yet tag activities with a category, so `tripAdapter` passes an empty id and cards currently fall back to a generic icon; adding `category` to `ItineraryItem` is what would light these back up.
+`constants/blockImages.ts` maps a stable activity id (e.g. `"cultura"`, `"playa"`, `"llegada"`) to a hand-picked, verified real Wikimedia Commons photo (never illustrations/icons). Day cards get theirs from `ItineraryItem.preference`, which `tripAdapter` translates through `PREFERENCE_TO_ACTIVITY_ID`. The same id drives the day badge ("Playa", "Sabores"…) in `DayCard`.
+
+What travels to the UI is the **preference**, not the provider's `category`: the mock speaks Spanish themes (`cultura`, `vida_nocturna`) and Overture speaks `basic_category` (`museum`, `art_gallery`, `dance_club`), so the eight preferences are the only vocabulary both share. `dominantPreference` (`server/utils/preferences.ts`) derives it, and both providers fill it in.
+
+Photos are **per theme, not per place**: every museum in every city shares one photo. That keeps image API calls at zero, but reads odd now that places are real (the Museo Nazionale Etrusco under an aerial shot of Lübeck). Fixing it means a paid image search — the `website` column already stored for each Overture place is the likelier starting point.
 
 ### Geocoding
 

@@ -10,6 +10,9 @@ function toActivityCandidate(place: StoredPlace): ActivityCandidate {
     // Villa Giulia", no "Entrada al museo principal (Roma)".
     name: place.name,
     category: place.basicCategory,
+    // Ya viene calculada de la carga (columna `preference` de la tabla
+    // places): es la que decide la foto y la etiqueta de la tarjeta del día.
+    preference: place.preference,
     profile: place.profile,
     latitude: place.latitude,
     longitude: place.longitude,

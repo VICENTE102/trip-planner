@@ -1,3 +1,5 @@
+import type { TravelPreference } from "./trip.js";
+
 export interface ItineraryItem {
   id: string;
   startTime: string;
@@ -6,6 +8,10 @@ export interface ItineraryItem {
   title: string;
   description?: string;
   placeId?: string;
+  // Solo en los ítems de tipo "visit": la preferencia dominante del sitio.
+  // Es lo que permite a la tarjeta del día elegir su foto y su etiqueta sin
+  // conocer el vocabulario de categorías de cada proveedor.
+  preference?: TravelPreference;
   latitude?: number;
   longitude?: number;
   durationMinutes: number;

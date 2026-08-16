@@ -6,9 +6,9 @@ import type {
   PreferenceLevel,
   PreferenceProfile,
   ScoreBreakdown,
-  TravelPreference,
   TripCombination,
 } from "../types/trip.js";
+import { ALL_PREFERENCES } from "../utils/preferences.js";
 import { allocateBudget } from "./allocate-budget.js";
 import { normalizeScore } from "./normalize-score.js";
 import { calculatePreferenceScore } from "./score-preferences.js";
@@ -184,17 +184,6 @@ export function combineOffers(
 
   return combinations;
 }
-
-const ALL_PREFERENCES: TravelPreference[] = [
-  "beach",
-  "culture",
-  "gastronomy",
-  "nightlife",
-  "nature",
-  "shopping",
-  "family",
-  "relax",
-];
 
 // El "perfil de afinidad" de una combinación no es el de una sola
 // actividad: para cada preferencia, se toma el mejor valor que ofrece

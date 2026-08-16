@@ -111,6 +111,9 @@ export interface ItineraryItem {
   title: string;
   description?: string;
   placeId?: string;
+  // Solo en las visitas: la preferencia dominante del sitio. Es lo que
+  // tripAdapter traduce a la clave temática de constants/blockImages.ts.
+  preference?: TravelPreference;
   latitude?: number;
   longitude?: number;
   durationMinutes: number;

@@ -70,11 +70,37 @@ const SLOT_LABELS: Record<Slot, string> = {
   night: "Noche",
 };
 
-// El backend no marca la categoría temática del sitio en el ItineraryItem
-// (solo placeId y title), así que no hay clave con la que elegir foto en
-// constants/blockImages.ts y las tarjetas caen en el icono genérico. Se
-// arregla añadiendo `category` a ItineraryItem, que es un paso propio.
+// El backend marca cada visita con su preferencia dominante (ocho valores,
+// ver server/utils/preferences.ts). Aquí se traduce a la clave temática con
+// la que constants/blockImages.ts guarda su foto y DayCard su etiqueta.
+//
+// Se mapea la preferencia y no la categoría del proveedor a propósito: el
+// mock habla en temas en español y Overture en `basic_category` inglesas y
+// mucho más finas ("museum", "art_gallery", "historic_site"...). La
+// preferencia es el único vocabulario que comparten los dos.
+const PREFERENCE_TO_ACTIVITY_ID: Record<string, string> = {
+  beach: "playa",
+  culture: "cultura",
+  gastronomy: "gastronomia",
+  nightlife: "vida-nocturna",
+  nature: "naturaleza",
+  shopping: "compras",
+  family: "familia",
+  relax: "relax",
+};
+
+// Una franja sin visitas —o con una visita cuyo sitio no tiene afinidad con
+// ninguna preferencia— se queda sin foto y cae en el icono genérico, que es
+// mejor que enseñar una playa en un día de museos.
 const UNKNOWN_ACTIVITY_ID = "";
+
+function activityIdOf(items: ItineraryItem[]): string {
+  for (const item of items) {
+    const id = item.preference ? PREFERENCE_TO_ACTIVITY_ID[item.preference] : undefined;
+    if (id) return id;
+  }
+  return UNKNOWN_ACTIVITY_ID;
+}
 
 function joinTitles(items: ItineraryItem[]): string {
   return items.map((item) => item.title).join(" · ");
@@ -172,10 +198,17 @@ function toDay(backendDay: BackendItineraryDay, isArrivalDay: boolean): Itinerar
     date: backendDay.date,
     isArrivalDay,
     morning,
-    morningActivityId: UNKNOWN_ACTIVITY_ID,
+    // El día de llegada tiene su propia foto (el aeropuerto) cuando el vuelo
+    // ocupa la mañana y no hay visitas que representar.
+    morningActivityId:
+      morningVisits.length > 0
+        ? activityIdOf(morningVisits)
+        : isArrivalDay && arrivalItems.length > 0
+          ? "llegada"
+          : UNKNOWN_ACTIVITY_ID,
     meals,
     afternoon: afternoonVisits.length > 0 ? joinTitles(afternoonVisits) : "Tarde sin actividades programadas.",
-    afternoonActivityId: UNKNOWN_ACTIVITY_ID,
+    afternoonActivityId: activityIdOf(afternoonVisits),
     night: nightVisits.length > 0 ? joinTitles(nightVisits) : "Noche sin actividades programadas.",
     stops,
   };

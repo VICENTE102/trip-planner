@@ -302,6 +302,7 @@ export function scheduleDayActivities(places: ActivityCandidate[], context: Sche
       type: "visit",
       title: place.name,
       placeId: place.id,
+      preference: place.preference,
       latitude: place.latitude,
       longitude: place.longitude,
       durationMinutes: place.estimatedDurationMinutes,

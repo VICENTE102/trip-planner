@@ -150,6 +150,28 @@ describe("scheduleDayActivities", () => {
     expect(detectOverlaps(day.items)).toEqual([]);
   });
 
+  // La preferencia es lo único que llega a la interfaz para elegir la foto y
+  // la etiqueta de la tarjeta del día. Si se pierde aquí, las tarjetas
+  // vuelven al icono genérico y todos los días pasan a poner "Explora" — que
+  // es exactamente como estaban antes de conectarla, y en silencio.
+  it("conserva la preferencia del sitio en el ítem de visita", () => {
+    const day = scheduleDayActivities(
+      [activity("a", 90, { preference: "beach" }), activity("b", 60, { preference: "gastronomy" })],
+      baseContext(),
+    );
+
+    const visitas = day.items.filter((item) => item.type === "visit");
+    expect(visitas).toHaveLength(2);
+    expect(visitas.map((item) => item.preference)).toEqual(["beach", "gastronomy"]);
+  });
+
+  it("deja la preferencia sin definir en lo que no es una visita", () => {
+    const day = scheduleDayActivities([activity("a", 90, { preference: "culture" })], baseContext());
+    for (const item of day.items.filter((i) => i.type !== "visit")) {
+      expect(item.preference).toBeUndefined();
+    }
+  });
+
   it("respeta el día completo cuando no es ni de llegada ni de salida", () => {
     const day = scheduleDayActivities([activity("a", 60)], baseContext());
     for (const item of day.items) {

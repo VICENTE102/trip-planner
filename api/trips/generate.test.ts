@@ -137,6 +137,27 @@ describe("POST /api/trips/generate", () => {
     }
   });
 
+  // La cadena preferencia -> foto de la tarjeta se rompió una vez en
+  // silencio: el campo no llegaba al ItineraryItem, las tarjetas caían al
+  // icono genérico y todos los días ponían "Explora". Nada fallaba, solo se
+  // veía peor. Esta prueba vigila el extremo del que depende la interfaz.
+  it("toda visita llega con su preferencia, que es lo que elige la foto del día", async () => {
+    const proposals = (await generar(PETICION)).payload.proposals as TripProposal[];
+    const preferenciasValidas = ["beach", "culture", "gastronomy", "nightlife", "nature", "shopping", "family", "relax"];
+
+    let visitas = 0;
+    for (const p of proposals) {
+      for (const dia of p.itinerary) {
+        for (const item of dia.items.filter((i) => i.type === "visit")) {
+          visitas++;
+          expect(item.preference, `"${item.title}" llegó sin preferencia`).toBeDefined();
+          expect(preferenciasValidas).toContain(item.preference);
+        }
+      }
+    }
+    expect(visitas, "el viaje de prueba debería tener visitas que comprobar").toBeGreaterThan(0);
+  });
+
   it("es determinista: la misma petición da el mismo resultado", async () => {
     const primera = (await generar(PETICION)).payload.proposals as TripProposal[];
     const segunda = (await generar(PETICION)).payload.proposals as TripProposal[];

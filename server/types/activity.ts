@@ -1,4 +1,4 @@
-import type { PreferenceProfile } from "./trip.js";
+import type { PreferenceProfile, TravelPreference } from "./trip.js";
 import type { Coordinates } from "./geocoding.js";
 
 export interface OpeningPeriod {
@@ -10,7 +10,15 @@ export interface OpeningPeriod {
 export interface ActivityCandidate {
   id: string;
   name: string;
+  // Categoría en el vocabulario del proveedor: temas en español en el mock,
+  // `basic_category` de Overture en los sitios reales. Sirve para depurar y
+  // para filtrar; NO para decidir nada en la interfaz, porque cada proveedor
+  // habla su idioma.
   category: string;
+  // Preferencia dominante (ver utils/preferences.ts). Este sí es vocabulario
+  // común a todos los proveedores, y es lo que llega a la tarjeta del día
+  // para elegir su foto y su etiqueta.
+  preference?: TravelPreference;
   profile: PreferenceProfile;
   latitude: number;
   longitude: number;

@@ -2,6 +2,7 @@ import type { ActivityCandidate, ActivitySearchRequest, OpeningPeriod } from "..
 import type { PreferenceLevel, PreferenceProfile, TravelPreference } from "../types/trip.js";
 import { createSeededRandom, hashString, pick } from "../utils/random.js";
 import { jitterCoordinates } from "../utils/geo.js";
+import { ALL_PREFERENCES, dominantPreference } from "../utils/preferences.js";
 
 interface ActivityTemplate {
   name: string;
@@ -10,17 +11,6 @@ interface ActivityTemplate {
   durationRange: [number, number];
   priceRange: [number, number];
 }
-
-const ALL_PREFERENCES: TravelPreference[] = [
-  "beach",
-  "culture",
-  "gastronomy",
-  "nightlife",
-  "nature",
-  "shopping",
-  "family",
-  "relax",
-];
 
 // Cada plantilla puntúa fuerte en 1-2 preferencias y 0 en el resto, para que
 // la selección por afinidad (sección 6.2, Fase 9) tenga datos coherentes
@@ -96,12 +86,16 @@ export function generateMockActivities(request: ActivitySearchRequest): Activity
     const [minDuration, maxDuration] = template.durationRange;
     const [minPrice, maxPrice] = template.priceRange;
     const coordinates = jitterCoordinates(center, random, 0.15);
+    const profile = buildProfile(template.profile);
 
     activities.push({
       id: `activity-${seed}-${i}`,
       name: `${template.name} (${request.destination})`,
       category: template.category,
-      profile: buildProfile(template.profile),
+      // Se deriva del perfil en vez de escribirla en cada plantilla: así no
+      // puede contradecir a los niveles de afinidad que sí usa el motor.
+      preference: dominantPreference(profile),
+      profile,
       latitude: coordinates.lat,
       longitude: coordinates.lng,
       rating: Math.round((3 + random() * 2) * 10) / 10,
