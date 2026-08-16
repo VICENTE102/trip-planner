@@ -45,6 +45,14 @@ What travels to the UI is the **preference**, not the provider's `category`: the
 
 Photos are **per theme, not per place**: every museum in every city shares one photo. That keeps image API calls at zero, but reads odd now that places are real (the Museo Nazionale Etrusco under an aerial shot of Lübeck). Fixing it means a paid image search — the `website` column already stored for each Overture place is the likelier starting point.
 
+### Rate limiting and spend control
+
+The per-IP limit is a **Vercel WAF rule, not code** — it cuts at the edge before the function runs, so abusive traffic costs no invocation and no Supabase read. Do not add an in-code IP limiter: it would need a shared counter (functions do not share memory) and would charge every legitimate request an extra round-trip to do worse what the platform does free.
+
+What *is* in code is the **daily cap on external API calls** (`server/services/usage.service.ts`), because the WAF's window maxes out at 10 minutes and the thing being protected here is the providers' quota. Over the cap, Geoapify and ORS stop being called and the seeded mocks take over — the same degradation as a missing key.
+
+Two rules that look like bugs but are deliberate: the counter is incremented by a Postgres function (`increment_api_usage`) rather than a client-side upsert, because concurrent `count + 1` writes would clobber each other; and **when the counter is unavailable the call is allowed through** — a broken counter must never take geocoding and routing down with it.
+
 ### Travel times
 
 `server/services/routes.service.ts` resolves the walking matrix between the hotels and the selected activities: `routes_cache` in Supabase → one OpenRouteService matrix → the haversine estimate. It never throws, same as geocoding.

@@ -92,6 +92,39 @@ Con la línea recta a 20 km/h, el Coliseo y la Basílica de San Pedro salían a
 10 minutos cuando andando son 49. Y si la estimación sale peor que ir
 andando, se anda: es una opción real y es el dato que sí conocemos.
 
+## Seguridad y control de gasto
+
+**Límite por IP: regla del WAF de Vercel**, no código. Corta en el edge antes
+de que se ejecute la función, así que un bot no gasta ni invocación ni
+lectura de base de datos. Está incluido en el plan Hobby (1 regla por
+proyecto). Se configura en Vercel → Firewall → Configure → New Rule.
+
+**Tope diario de llamadas a APIs externas** (`server/services/usage.service.ts`),
+que es lo que el WAF no puede dar: su ventana máxima es de 10 minutos, no un
+día, y aquí lo que se protege es la *cuota* de los proveedores.
+
+| Proveedor | Tope diario | Plan gratuito del proveedor |
+|---|---|---|
+| Geoapify | 500 | ~3.000/día |
+| OpenRouteService | 400 | ~2.500/día |
+
+Al superarlo se deja de llamar al proveedor real y se usan los simulados,
+avisando en los logs. No es un error: es la misma degradación que ya ocurre
+cuando falta una clave.
+
+El contador vive en `api_usage` y se incrementa con una función de Postgres
+(`increment_api_usage`), no con un upsert desde el cliente: dos peticiones
+simultáneas leyendo y escribiendo `count + 1` se pisarían. **Si el contador
+falla, se deja pasar la llamada**: equivocarse por ese lado cuesta unas
+llamadas de más; por el otro, romper el producto entero.
+
+Las cachés son la primera defensa y ya estaban: un bot que repita el mismo
+destino gasta **cero** llamadas externas. El caso caro es un bot que varíe el
+destino en cada petición, y es justo el que topa el contador.
+
+**Ninguna clave llega al navegador.** No queda ningún `import.meta.env` en
+`src/`.
+
 ## Pruebas
 
 ```bash

@@ -177,6 +177,28 @@ describe("resolveTravelMatrix", () => {
     expect(matriz.some((e) => e.fromId === e.toId)).toBe(false);
   });
 
+  // Paso 8: con el tope diario agotado se estima en línea recta en vez de
+  // gastar la cuota de ORS.
+  it("no llama a ORS si se ha agotado el tope diario", async () => {
+    let llamadas = 0;
+    vi.stubGlobal("fetch", async () => {
+      llamadas++;
+      return new Response(JSON.stringify({ durations: [[0, 600], [600, 0]], distances: [[0, 1], [1, 0]] }), { status: 200 });
+    });
+    vi.doMock("../repositories/usage.repository.js", () => ({
+      readApiUsage: async () => 100000,
+      incrementApiUsage: async () => 100001,
+    }));
+
+    const { resolveTravelMatrix } = await loadService();
+    const matriz = await resolveTravelMatrix([HOTEL, MUSEO]);
+
+    expect(llamadas).toBe(0);
+    expect(matriz).toHaveLength(2);
+    for (const entry of matriz) expect(entry.travelMinutes).toBeGreaterThan(0);
+    vi.doUnmock("../repositories/usage.repository.js");
+  });
+
   it("no llama a ORS con menos de dos puntos", async () => {
     let llamadas = 0;
     vi.stubGlobal("fetch", async () => {

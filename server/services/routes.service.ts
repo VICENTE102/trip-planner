@@ -7,6 +7,7 @@ import {
   type OpenRouteServiceProvider,
 } from "../providers/openrouteservice-routes.provider.js";
 import { readCachedLegs, routeKey, writeCachedLegs, type LegToCache } from "../repositories/routes.repository.js";
+import { canCallProvider, recordProviderCall } from "./usage.service.js";
 
 // Por encima de este tiempo andando, el trayecto deja de ser "un paseo entre
 // dos museos" y pasa a ser algo que cualquiera haría en metro. Como la API
@@ -123,7 +124,11 @@ export async function resolveTravelMatrix(places: RoutePlace[]): Promise<TravelM
     console.warn(`[routes] ${places.length} puntos superan el máximo de ${MAX_MATRIX_LOCATIONS}; se estiman en línea recta.`);
   }
 
-  if (allResolved || !provider || tooManyForOneMatrix) {
+  // Paso 8: por encima del tope diario se estima en línea recta en vez de
+  // llamar. Se comprueba solo si de verdad hiciera falta llamar.
+  const withinBudget = allResolved || !provider ? true : await canCallProvider("openrouteservice");
+
+  if (allResolved || !provider || tooManyForOneMatrix || !withinBudget) {
     // Sin clave no se cachea nada: guardar la estimación del mock dejaría
     // tiempos inventados clavados y configurar ORS_API_KEY más tarde ya no
     // arreglaría estos pares.
@@ -135,6 +140,7 @@ export async function resolveTravelMatrix(places: RoutePlace[]): Promise<TravelM
     // matriz vuelve entera de todas formas, y así una búsqueda gasta como
     // mucho una llamada.
     const legs = await provider.calculateLegs(places);
+    await recordProviderCall("openrouteservice");
     const toCache: LegToCache[] = [];
 
     for (const leg of legs) {

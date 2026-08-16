@@ -93,26 +93,14 @@ const CURATED_IMAGES: Record<string, string> = {
   ljubljana: "https://upload.wikimedia.org/wikipedia/commons/6/67/Ljubljanski_grad_in_Grajski_gri%C4%8D.jpg",
 };
 
-const PEXELS_API_KEY = import.meta.env.VITE_PEXELS_API_KEY as string | undefined;
-
-const cache = new Map<string, string | null>();
-
-async function fetchPexelsPhoto(city: string): Promise<string | null> {
-  if (!PEXELS_API_KEY) return null;
-
-  try {
-    const response = await fetch(
-      `https://api.pexels.com/v1/search?query=${encodeURIComponent(`${city} landmark`)}&per_page=1&orientation=landscape`,
-      { headers: { Authorization: PEXELS_API_KEY } },
-    );
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    return data.photos?.[0]?.src?.large2x ?? data.photos?.[0]?.src?.large ?? null;
-  } catch {
-    return null;
-  }
-}
+// Paso 8: aquí había una búsqueda en Pexels con VITE_PEXELS_API_KEY, la
+// única clave que llegaba al navegador. Una clave en el bundle la puede
+// sacar cualquiera y gastarla contra tu cuota, así que se retira.
+//
+// No se pierde nada: nunca llegó a configurarse, ni en local ni en Vercel,
+// así que el camino estaba muerto y todos los destinos ya se resolvían con
+// las fotos curadas de arriba. Si algún día hace falta buscar imágenes, la
+// llamada tiene que salir del servidor, como Geoapify y OpenRouteService.
 
 export async function getDestinationImageUrl(destination: string): Promise<string | null> {
   const city = normalizeCityName(destination);
@@ -122,11 +110,5 @@ export async function getDestinationImageUrl(destination: string): Promise<strin
     return CURATED_IMAGES[city];
   }
 
-  if (cache.has(city)) {
-    return cache.get(city) ?? null;
-  }
-
-  const imageUrl = await fetchPexelsPhoto(city);
-  cache.set(city, imageUrl);
-  return imageUrl;
+  return null;
 }

@@ -139,6 +139,27 @@ describe("resolveCityCenter", () => {
     expect(Number.isFinite(centro.lat)).toBe(true);
   });
 
+  // Paso 8: con el tope diario agotado no se llama al proveedor real, se usa
+  // el centro simulado. Es la misma degradación que cuando falta la clave.
+  it("no llama al proveedor si se ha agotado el tope diario", async () => {
+    let llamadas = 0;
+    vi.stubGlobal("fetch", async () => {
+      llamadas++;
+      return new Response(JSON.stringify(AMSTERDAM), { status: 200 });
+    });
+    vi.doMock("../repositories/usage.repository.js", () => ({
+      readApiUsage: async () => 100000,
+      incrementApiUsage: async () => 100001,
+    }));
+
+    const { resolveCityCenter } = await loadService();
+    const centro = await resolveCityCenter("Ámsterdam");
+
+    expect(llamadas).toBe(0);
+    expect(Number.isFinite(centro.lat)).toBe(true);
+    vi.doUnmock("../repositories/usage.repository.js");
+  });
+
   it("es determinista sin clave: el mismo destino da siempre el mismo centro", async () => {
     vi.stubEnv("GEOAPIFY_API_KEY", "");
 

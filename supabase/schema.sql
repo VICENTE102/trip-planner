@@ -137,16 +137,56 @@ create table if not exists routes_cache (
   created_at timestamptz not null default now()
 );
 
+-- Paso 8: tope diario de llamadas a APIs externas.
+--
+-- El límite por IP lo pone el WAF de Vercel, que corta en el edge antes de
+-- que se ejecute nada. Esto cubre lo que el WAF no puede: su ventana máxima
+-- es de 10 minutos, no un día, y aquí lo que se protege es la CUOTA de
+-- Geoapify y OpenRouteService, no el volumen de peticiones.
+--
+-- Al superar el tope se deja de llamar al proveedor real y se usan los
+-- simulados. No es un error: es la misma degradación que ya ocurre cuando
+-- falta una clave.
+create table if not exists api_usage (
+  day date not null,
+  provider text not null,
+  call_count integer not null default 0,
+  primary key (day, provider)
+);
+
+-- El contador se incrementa con una función y no con un upsert desde el
+-- cliente: dos peticiones simultáneas leyendo y escribiendo `call_count + 1`
+-- por su cuenta se pisarían, y el tope dejaría de contar bien justo cuando
+-- más importa (bajo carga). Aquí el incremento es atómico.
+create or replace function increment_api_usage(p_provider text)
+returns integer
+language plpgsql
+as $$
+declare
+  new_count integer;
+begin
+  insert into api_usage (day, provider, call_count)
+  values (current_date, p_provider, 1)
+  on conflict (day, provider)
+  do update set call_count = api_usage.call_count + 1
+  returning call_count into new_count;
+
+  return new_count;
+end;
+$$;
+
 alter table trip_requests enable row level security;
 alter table trip_proposals enable row level security;
 alter table provider_searches enable row level security;
 alter table geocoding_cache enable row level security;
 alter table places enable row level security;
 alter table routes_cache enable row level security;
+alter table api_usage enable row level security;
 
 -- Las claves API nuevas de Supabase (sb_secret_...) no heredan en automático
 -- los privilegios por defecto sobre tablas nuevas del rol service_role, así
 -- que hay que concedérselos explícitamente (RLS activado arriba sigue
 -- bloqueando anon/authenticated; service_role la salta siempre por diseño).
-grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache, places, routes_cache to service_role;
+grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache, places, routes_cache, api_usage to service_role;
+grant execute on function increment_api_usage(text) to service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to service_role;

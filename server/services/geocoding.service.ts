@@ -4,6 +4,7 @@ import { createGeoapifyGeocodingProvider } from "../providers/geoapify-geocoding
 import { mockGeocodingProvider } from "../providers/mock-geocoding.provider.js";
 import { readCachedGeocoding, writeCachedGeocoding } from "../repositories/geocoding.repository.js";
 import { normalizeCityName } from "../utils/text.js";
+import { canCallProvider, recordProviderCall } from "./usage.service.js";
 
 // Caché de proceso: mientras la función serverless siga caliente, el mismo
 // destino no vuelve ni a Supabase. Solo guarda respuestas de un proveedor
@@ -57,6 +58,11 @@ export async function resolveCityCenter(destination: string): Promise<Coordinate
   }
 
   const provider = getRealProvider();
+  // Paso 8: por encima del tope diario se deja de llamar al proveedor real.
+  // No es un error, es la misma degradación que cuando no hay clave.
+  if (provider && !(await canCallProvider("geoapify"))) {
+    return mockCenter(destination);
+  }
   if (!provider) {
     // Sin clave no se cachea nada: si se guardase el centro simulado,
     // configurar GEOAPIFY_API_KEY más tarde no arreglaría este destino,
@@ -77,6 +83,7 @@ export async function resolveCityCenter(destination: string): Promise<Coordinate
     //    acentos —"Berlín" y "Núremberg" resuelven bien— pero basta un caso
     //    para mandar un viaje al continente equivocado.
     const city = await provider.geocodeCity(key);
+    await recordProviderCall("geoapify");
     memoryCache.set(key, city ?? null);
     await writeCachedGeocoding({
       destinationKey: key,
