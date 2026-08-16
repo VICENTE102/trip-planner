@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ActivityCandidate } from "../types/activity.js";
 import type { ItineraryItem } from "../types/itinerary.js";
+import type { TravelMatrixEntry } from "../types/route.js";
 import type { PreferenceProfile } from "../types/trip.js";
 import { detectOverlaps } from "./validate-trip.js";
 import { isoMinutesOfDay, scheduleDayActivities } from "./schedule-itinerary.js";
@@ -42,11 +43,22 @@ function baseContext(overrides: Partial<Parameters<typeof scheduleDayActivities>
     isArrivalDay: false,
     isDepartureDay: false,
     preferences: NO_PREFERENCES,
-    travelMinutes: () => 0,
+    travelLeg: () => undefined,
     hotel: HOTEL,
     ...overrides,
   };
 }
+
+// Un tramo de la matriz con los minutos y el modo que se quieran probar.
+const leg =
+  (travelMinutes: number, transportMode: TravelMatrixEntry["transportMode"] = "walk") =>
+  (fromId: string, toId: string): TravelMatrixEntry => ({
+    fromId,
+    toId,
+    distanceKm: travelMinutes / 12,
+    travelMinutes,
+    transportMode,
+  });
 
 const minutes = (item: ItineraryItem) => ({
   inicio: isoMinutesOfDay(item.startTime),
@@ -64,7 +76,7 @@ describe("scheduleDayActivities", () => {
     // ellas para que haya un ítem de viaje que pueda solaparse.
     const day = scheduleDayActivities(
       [activity("a", 100), activity("b", 100), activity("c", 100)],
-      baseContext({ travelMinutes: () => 20 }),
+      baseContext({ travelLeg: leg(20) }),
     );
 
     const pausa = day.items.find((item) => item.type === "free_time" && item.title === "Pausa");
@@ -144,7 +156,7 @@ describe("scheduleDayActivities", () => {
         activity("b", 120),
         activity("c", 60),
       ],
-      baseContext({ travelMinutes: () => 25 }),
+      baseContext({ travelLeg: leg(25) }),
     );
 
     expect(detectOverlaps(day.items)).toEqual([]);
@@ -170,6 +182,46 @@ describe("scheduleDayActivities", () => {
     for (const item of day.items.filter((i) => i.type !== "visit")) {
       expect(item.preference).toBeUndefined();
     }
+  });
+
+  // El modo lo decide routes.service.ts, que es quien sabe si un trayecto se
+  // anda o si es demasiado largo y se estima en transporte. Si aquí solo
+  // llegaran los minutos, un viaje en metro se guardaría como si fuera a pie
+  // — el dato existiría en el backend y se perdería justo antes de la
+  // interfaz, igual que pasó con la preferencia.
+  it("conserva el modo de transporte en el ítem de desplazamiento", () => {
+    const day = scheduleDayActivities(
+      [activity("a", 60), activity("b", 60)],
+      baseContext({ travelLeg: leg(28, "transit") }),
+    );
+
+    const desplazamientos = day.items.filter((item) => item.type === "walk");
+    expect(desplazamientos.length).toBeGreaterThan(0);
+    for (const item of desplazamientos) {
+      expect(item.transportMode).toBe("transit");
+    }
+  });
+
+  it("marca como a pie los trayectos que se andan", () => {
+    const day = scheduleDayActivities(
+      [activity("a", 60), activity("b", 60)],
+      baseContext({ travelLeg: leg(12, "walk") }),
+    );
+
+    for (const item of day.items.filter((i) => i.type === "walk")) {
+      expect(item.transportMode).toBe("walk");
+    }
+  });
+
+  it("usa los minutos del tramo para colocar la visita siguiente", () => {
+    const day = scheduleDayActivities(
+      [activity("a", 60), activity("b", 60)],
+      baseContext({ travelLeg: leg(30, "transit") }),
+    );
+
+    const desplazamiento = day.items.find((item) => item.type === "walk")!;
+    expect(desplazamiento.durationMinutes).toBe(30);
+    expect(desplazamiento.travelMinutesFromPrevious).toBe(30);
   });
 
   it("respeta el día completo cuando no es ni de llegada ni de salida", () => {

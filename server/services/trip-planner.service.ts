@@ -1,5 +1,6 @@
 import type { ValidatedTripRequest } from "../schemas/trip.schema.js";
 import type { ItineraryDay } from "../types/itinerary.js";
+import type { TravelMatrixEntry } from "../types/route.js";
 import type { PreferenceProfile, ProviderSearchLog, TripCombination, TripProposal } from "../types/trip.js";
 import { mockFlightProvider } from "../providers/mock-flight.provider.js";
 import { mockAccommodationProvider } from "../providers/mock-accommodation.provider.js";
@@ -57,7 +58,7 @@ async function buildItineraryForCombination(
     days: number;
     departureDateIso: string;
     preferences: PreferenceProfile;
-    travelMinutes: (fromId: string, toId: string) => number;
+    travelLeg: (fromId: string, toId: string) => TravelMatrixEntry | undefined;
   },
 ): Promise<ItineraryDay[]> {
   const hotel = {
@@ -67,7 +68,7 @@ async function buildItineraryForCombination(
     longitude: combination.accommodation.longitude,
   };
 
-  const travelMinutes = context.travelMinutes;
+  const travelLeg = context.travelLeg;
   const allocations = distributePlacesAcrossDays(combination.activities, context.days, context.preferences);
   const outboundArrival = combination.flight.outbound[combination.flight.outbound.length - 1].arrivalTime;
   const inboundDeparture = combination.flight.inbound?.[0]?.departureTime;
@@ -86,7 +87,7 @@ async function buildItineraryForCombination(
       arrivalTime: isArrivalDay ? outboundArrival : undefined,
       departureTime: isDepartureDay ? inboundDeparture : undefined,
       preferences: context.preferences,
-      travelMinutes,
+      travelLeg,
       hotel,
     });
   });
@@ -211,7 +212,7 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
 
   const travelMatrix = await resolveTravelMatrix([...hotelPlaces, ...activityPlaces]);
   const travelLookup = buildTravelMatrixLookup(travelMatrix);
-  const travelMinutes = (fromId: string, toId: string) => travelLookup.get(`${fromId}->${toId}`)?.travelMinutes ?? 0;
+  const travelLeg = (fromId: string, toId: string) => travelLookup.get(`${fromId}->${toId}`);
 
   const proposals = await selectDiverseProposals(nonDominated, {
     userBudget: request.budget,
@@ -220,7 +221,7 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     evaluatedCombinations: combinations.length,
     discardedCombinations,
     buildItinerary: (combination) =>
-      buildItineraryForCombination(combination, { days, departureDateIso, preferences, travelMinutes }),
+      buildItineraryForCombination(combination, { days, departureDateIso, preferences, travelLeg }),
   });
 
   const cheapestTotalCost = combinations.length

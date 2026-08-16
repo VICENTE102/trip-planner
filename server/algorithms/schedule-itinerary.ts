@@ -1,5 +1,6 @@
 import type { ActivityCandidate } from "../types/activity.js";
 import type { ItineraryDay, ItineraryItem } from "../types/itinerary.js";
+import type { TravelMatrixEntry } from "../types/route.js";
 import type { PreferenceProfile } from "../types/trip.js";
 import type { ClusterablePlace } from "./cluster-places.js";
 import { clusterPlacesByProximity } from "./cluster-places.js";
@@ -148,7 +149,12 @@ export interface ScheduleDayContext {
   arrivalTime?: string; // ISO datetime del vuelo de ida, solo día de llegada
   departureTime?: string; // ISO datetime del vuelo de vuelta, solo día de salida
   preferences: PreferenceProfile;
-  travelMinutes: (fromId: string, toId: string) => number;
+  // Devuelve el tramo completo, no solo los minutos: el modo de transporte
+  // lo decide quien calcula la matriz (routes.service.ts sabe si un trayecto
+  // se anda o si es demasiado largo y se estima en transporte), y si aquí
+  // solo llegaran los minutos, ese dato se perdería y el ítem diría "a pie"
+  // de un viaje en metro.
+  travelLeg: (fromId: string, toId: string) => TravelMatrixEntry | undefined;
   hotel: { id: string; name: string };
 }
 
@@ -250,7 +256,8 @@ export function scheduleDayActivities(places: ActivityCandidate[], context: Sche
   for (const place of places) {
     maybeScheduleLunch();
 
-    const travelMinutes = lastPlaceId === place.id ? 0 : context.travelMinutes(lastPlaceId, place.id);
+    const leg = lastPlaceId === place.id ? undefined : context.travelLeg(lastPlaceId, place.id);
+    const travelMinutes = leg?.travelMinutes ?? 0;
     let startMinutes = calculateNextStartTime(cursor, travelMinutes);
     // Inicio real del desplazamiento (no derivado por resta de startMinutes
     // más abajo): así, si el horario de apertura o la pausa desplazan
@@ -294,6 +301,7 @@ export function scheduleDayActivities(places: ActivityCandidate[], context: Sche
         durationMinutes: travelMinutes,
         startMinutes: travelStartMinutes,
         travelMinutesFromPrevious: travelMinutes,
+        transportMode: leg?.transportMode,
         verificationStatus: "unverified",
       });
     }
