@@ -6,6 +6,8 @@ interface HotelCardProps {
   selected?: boolean;
   onSelect?: () => void;
   bookingUrl?: string;
+  // Solo para la medición del clic de reserva; la tarjeta no lo pinta.
+  destination?: string;
 }
 
 const TIER_LABELS: Record<Hotel["tier"], string> = {
@@ -20,7 +22,7 @@ const TIER_BADGE_CLASSES: Record<Hotel["tier"], string> = {
   caro: "bg-ink-900 text-sunset-100",
 };
 
-export function HotelCard({ hotel, selected, onSelect, bookingUrl }: HotelCardProps) {
+export function HotelCard({ hotel, selected, onSelect, bookingUrl, destination }: HotelCardProps) {
   return (
     <div
       className={`rounded-xl border p-3 transition ${
@@ -59,7 +61,13 @@ export function HotelCard({ hotel, selected, onSelect, bookingUrl }: HotelCardPr
 
       {bookingUrl && (
         <div className="mt-2">
-          <ExternalLinkButton href={bookingUrl} label="Reservar hotel" variant="primary" />
+          <ExternalLinkButton
+            href={bookingUrl}
+            label="Reservar hotel"
+            variant="primary"
+            category="alojamiento"
+            destination={destination}
+          />
         </div>
       )}
     </div>

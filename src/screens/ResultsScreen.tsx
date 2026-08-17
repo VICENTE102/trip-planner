@@ -12,6 +12,7 @@ import { Icon } from "../components/Icon";
 import { useTrips } from "../hooks/useTrips";
 import { useDestinationImage } from "../hooks/useDestinationImage";
 import { TIER_THEME } from "../constants/tierTheme";
+import { track } from "../services/analytics";
 
 interface ResultsLocationState {
   searchParams: SearchParams;
@@ -64,6 +65,7 @@ export function ResultsScreen() {
       proposal,
     };
     saveTrip(trip);
+    track("viaje_guardado", { destino: searchParams.destination, tier, coste: proposal.economicSummary.total });
     navigate("/mis-viajes");
   }
 
@@ -146,7 +148,14 @@ export function ResultsScreen() {
             </div>
           ) : (
             <>
-              <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
+              <Tabs
+                tabs={tabs}
+                activeId={activeTab}
+                onChange={(id) => {
+                  setActiveTab(id);
+                  track("propuesta_abierta", { destino: searchParams.destination, propuesta: id });
+                }}
+              />
 
               <div key={activeTab} className="animate-slide-in-trail pb-8">
                 {activeTab === "comparativa" ? (
@@ -155,7 +164,14 @@ export function ResultsScreen() {
                       <ProposalCompareRow
                         key={proposal.tier}
                         proposal={proposal}
-                        onViewDetail={() => setActiveTab(proposal.tier)}
+                        onViewDetail={() => {
+                          setActiveTab(proposal.tier);
+                          track("propuesta_abierta", {
+                            destino: searchParams.destination,
+                            propuesta: proposal.tier,
+                            desde: "comparativa",
+                          });
+                        }}
                       />
                     ))}
                   </div>

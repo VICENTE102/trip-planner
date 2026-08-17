@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { SearchParams, TierLevel, TripCategory } from "../types";
 import { validateSearchParams } from "../utils/validation";
@@ -7,6 +7,8 @@ import { PreferenceChips } from "./PreferenceChips";
 import { Icon } from "./Icon";
 import { TravelStamp } from "./TravelStamp";
 import { TIER_THEME } from "../constants/tierTheme";
+import { nightsBetween } from "../utils/dates";
+import { track } from "../services/analytics";
 
 interface SearchFormProps {
   onSubmit: (params: SearchParams) => Promise<void>;
@@ -59,7 +61,16 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
   const [travelersInput, setTravelersInput] = useState(String(initialParams.travelers));
   const [childrenInput, setChildrenInput] = useState(String(initialParams.children));
 
+  // El primer cambio en cualquier campo marca el inicio del embudo. Es el
+  // evento que revela cuánta gente empieza a rellenar y se va a medias, que
+  // es la fuga más cara de arreglar tarde.
+  const started = useRef(false);
+
   function updateField<K extends keyof SearchParams>(field: K, value: SearchParams[K]) {
+    if (!started.current) {
+      started.current = true;
+      track("formulario_iniciado");
+    }
     setParams((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -117,6 +128,13 @@ export function SearchForm({ onSubmit }: SearchFormProps) {
 
     setSubmitError(null);
     setIsTakingOff(true);
+    track("formulario_enviado", {
+      destino: params.destination,
+      dias: nightsBetween(params.departureDate, params.returnDate) + 1,
+      presupuesto: params.budget,
+      viajeros: params.travelers + params.children,
+      categoria: params.category,
+    });
 
     // let the takeoff animation play before triggering the search
     await new Promise((resolve) => setTimeout(resolve, 450));

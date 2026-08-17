@@ -380,6 +380,8 @@ export function DayCard({
                   label="Reservar actividad"
                   icon="compass"
                   variant="activity"
+                  category="actividad"
+                  destination={searchParams.destination}
                 />
               )
             }
@@ -408,6 +410,8 @@ export function DayCard({
                   label="Ver ubicación"
                   icon="mapPin"
                   variant="location"
+                  category="ubicacion"
+                  destination={searchParams.destination}
                 />
               }
             />
@@ -449,6 +453,8 @@ export function DayCard({
                   label="Reservar actividad"
                   icon="compass"
                   variant="activity"
+                  category="actividad"
+                  destination={searchParams.destination}
                 />
               )
             }

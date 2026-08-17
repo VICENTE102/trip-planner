@@ -4,6 +4,7 @@ import { WorldCollage } from "../components/WorldCollage";
 import { Icon } from "../components/Icon";
 import type { SearchParams } from "../types";
 import { formatTripApiError, generateTrip } from "../services/trip-api.client";
+import { track } from "../services/analytics";
 
 export function SearchScreen() {
   const navigate = useNavigate();
@@ -20,6 +21,15 @@ export function SearchScreen() {
     } catch (error) {
       throw new Error(formatTripApiError(error));
     }
+
+    // Cero propuestas es un resultado legítimo (el presupuesto no llega) y
+    // es justo el que hay que poder contar: dice cuánta gente se va sin nada.
+    track("propuestas_generadas", {
+      destino: params.destination,
+      cuantas: generation.proposals.length,
+      presupuesto: params.budget,
+      coste_minimo: generation.metadata.cheapestTotalCost ?? undefined,
+    });
 
     navigate("/results", { state: { searchParams: params, generation } });
   }

@@ -16,9 +16,9 @@ Vite no las incluye en el bundle y nunca llegan al navegador. En local van en
 | `GEOAPIFY_API_KEY` | Geocodificar el destino (coordenadas reales) | Se usan coordenadas simuladas (`MockGeocodingProvider`) |
 | `ORS_API_KEY` | Tiempos de desplazamiento a pie reales (OpenRouteService) | Se estiman en línea recta, como antes del Paso 5 |
 
-`VITE_PEXELS_API_KEY` es la excepción y sí es pública a propósito: la búsqueda
-de la foto de portada la hace el navegador. Es opcional; sin ella se usan las
-imágenes curadas de `src/services/destinationImage.ts`.
+`VITE_POSTHOG_KEY` es la excepción y **sí lleva prefijo `VITE_` a propósito**:
+es una clave pública de ingesta, pensada para vivir en el cliente, y solo
+permite *enviar* eventos a tu proyecto. Sin ella no se mide nada.
 
 ### Base de datos
 
@@ -92,6 +92,26 @@ Con la línea recta a 20 km/h, el Coliseo y la Basílica de San Pedro salían a
 10 minutos cuando andando son 49. Y si la estimación sale peor que ir
 andando, se anda: es una opción real y es el dato que sí conocemos.
 
+## Analítica y consentimiento
+
+Analítica de producto con [PostHog](https://posthog.com/) (1 M de eventos al
+mes gratis, datos en la UE). Ocho eventos que dibujan el embudo completo:
+desde que alguien empieza a rellenar el formulario hasta que descarga el PDF
+o pulsa un enlace de reserva.
+
+**Nada se carga ni se envía antes de que el usuario acepte**, ni siquiera el
+script (son 234 kB en su propio chunk). Los eventos que ocurren mientras el
+banner sigue en pantalla se guardan en una cola: si acepta, se envían; si
+rechaza, se descartan. Sin eso se perdería justo `formulario_iniciado`, que
+es el primer escalón del embudo.
+
+Se puede cambiar de opinión en `/privacidad`, enlazada desde el pie.
+
+> **Pendiente de revisión legal profesional.** Está hecho por el camino
+> conservador (nada antes del consentimiento, rechazar cuesta lo mismo que
+> aceptar, sin casillas premarcadas, revocable), pero lo ha escrito un
+> programador y no un abogado.
+
 ## Seguridad y control de gasto
 
 **Límite por IP: regla del WAF de Vercel**, no código. Corta en el edge antes
@@ -122,8 +142,8 @@ Las cachés son la primera defensa y ya estaban: un bot que repita el mismo
 destino gasta **cero** llamadas externas. El caso caro es un bot que varíe el
 destino en cada petición, y es justo el que topa el contador.
 
-**Ninguna clave llega al navegador.** No queda ningún `import.meta.env` en
-`src/`.
+**La única clave que llega al navegador es `VITE_POSTHOG_KEY`**, y solo
+permite enviar eventos. Todo lo demás vive en el servidor.
 
 ## Pruebas
 
@@ -133,8 +153,11 @@ npm run test:watch       # en modo vigilancia mientras desarrollas
 npm run test:integration # contra Geoapify y ORS de verdad (necesita sus claves)
 ```
 
-Las pruebas viven junto al código que comprueban y cubren solo el backend
-(`server/` y `api/`). Se ejecutan solas en cada push mediante GitHub Actions.
+Las pruebas viven junto al código que comprueban y cubren el backend
+(`server/`, `api/`) y la lógica de `src/services/` — consentimiento y
+analítica, donde un descuido significaría medir a alguien que dijo que no.
+No hay pruebas de componentes React, a propósito. Se ejecutan solas en cada
+push mediante GitHub Actions.
 
 `npm test` **no sale a la red ni necesita ninguna clave**: sin `SUPABASE_URL`,
 `GEOAPIFY_API_KEY` ni `ORS_API_KEY`, la cadena se resuelve con los proveedores

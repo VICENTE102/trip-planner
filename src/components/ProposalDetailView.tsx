@@ -12,6 +12,7 @@ import { Icon } from "./Icon";
 import { getHotelLink } from "../services/deepLinks";
 import { useDestinationImage } from "../hooks/useDestinationImage";
 import { normalizeCityName } from "../utils/text";
+import { track } from "../services/analytics";
 
 interface ProposalDetailViewProps {
   proposal: TripProposal;
@@ -64,6 +65,7 @@ export function ProposalDetailView({
   // principal a usuarios que nunca descargan el PDF.
   async function handleDownloadPdf() {
     setIsGeneratingPdf(true);
+    track("pdf_descargado", { destino: searchParams.destination, propuesta: tier });
     try {
       const [{ pdf }, { TripPdfDocument }, { downscaleImageForPdf }] = await Promise.all([
         import("@react-pdf/renderer"),
@@ -133,7 +135,14 @@ export function ProposalDetailView({
       </div>
 
       <div className="px-4 pt-3">
-        <Tabs tabs={sectionTabs} activeId={section} onChange={setSection} />
+        <Tabs
+          tabs={sectionTabs}
+          activeId={section}
+          onChange={(id) => {
+            setSection(id);
+            track("pestana_vista", { destino: searchParams.destination, propuesta: tier, seccion: id });
+          }}
+        />
       </div>
 
       <div
@@ -158,7 +167,9 @@ export function ProposalDetailView({
             onUpdateDay={onUpdateDay}
           />
         )}
-        {section === "alojamiento" && <HotelCard hotel={hotel} bookingUrl={hotelBookingUrl} />}
+        {section === "alojamiento" && (
+          <HotelCard hotel={hotel} bookingUrl={hotelBookingUrl} destination={searchParams.destination} />
+        )}
         {section === "vuelos" && <FlightSummary itinerary={itinerary} searchParams={searchParams} />}
         {section === "gastos" && <EconomicSummaryView summary={economicSummary} />}
       </div>

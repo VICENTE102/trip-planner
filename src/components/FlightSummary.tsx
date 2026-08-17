@@ -53,7 +53,14 @@ export function FlightSummary({ itinerary, searchParams }: FlightSummaryProps) {
         </p>
       )}
       <div className="mt-3">
-        <ExternalLinkButton href={flightBookingUrl} label="Reservar vuelo" icon="plane" variant="primary" />
+        <ExternalLinkButton
+          href={flightBookingUrl}
+          label="Reservar vuelo"
+          icon="plane"
+          variant="primary"
+          category="vuelo"
+          destination={searchParams.destination}
+        />
       </div>
     </div>
   );

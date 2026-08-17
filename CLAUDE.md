@@ -45,6 +45,14 @@ What travels to the UI is the **preference**, not the provider's `category`: the
 
 Photos are **per theme, not per place**: every museum in every city shares one photo. That keeps image API calls at zero, but reads odd now that places are real (the Museo Nazionale Etrusco under an aerial shot of Lübeck). Fixing it means a paid image search — the `website` column already stored for each Overture place is the likelier starting point.
 
+### Analytics and consent
+
+**Nothing is loaded or sent before the user accepts** — not even the PostHog script. `src/services/consent.ts` stores the choice; `src/services/analytics.ts` wraps PostHog behind it and queues events fired while the banner is still up, so the first funnel event (`formulario_iniciado`, which happens while the user is still deciding) is not lost. Rejecting discards the queue. `track()` never throws: no measurement may stop someone downloading their PDF.
+
+`VITE_POSTHOG_KEY` **is** a `VITE_` variable, unlike every other key here. That is correct: it is a public ingestion key meant to live in the client, and it only allows *sending* events to the project. It is not comparable to the Pexels key removed in Paso 8, which granted access to a search quota.
+
+> **Pending professional legal review.** The consent flow is written the conservative way — nothing before opt-in, Reject as prominent as Accept, no pre-ticked boxes, revocable from the footer — but it was written by a developer, not a lawyer, and Spain's AEPD has its own cookie criteria. Have it reviewed before the affiliate revenue of Paso 6 depends on it.
+
 ### Rate limiting and spend control
 
 The per-IP limit is a **Vercel WAF rule, not code** — it cuts at the edge before the function runs, so abusive traffic costs no invocation and no Supabase read. Do not add an in-code IP limiter: it would need a shared counter (functions do not share memory) and would charge every legitimate request an extra round-trip to do worse what the platform does free.
