@@ -31,38 +31,28 @@ export interface SelectProposalsContext {
   buildItinerary: (combination: TripCombination) => Promise<ItineraryDay[]>;
 }
 
-// Sección 10.6: cada perfil pondera los mismos 6 criterios de forma
-// distinta para que las tres propuestas no acaben siendo la misma
-// combinación con una etiqueta diferente. "Recomendada" usa exactamente
-// los pesos globales de la sección 10.2.
-const PROFILE_WEIGHTS: Record<ProposalType, Record<keyof ScoreBreakdown, number>> = {
-  economical: {
-    price: 0.55,
-    accommodationQuality: 0.15,
-    location: 0.05,
-    transportComfort: 0.1,
-    usableTime: 0.05,
-    preferenceMatch: 0.1,
-  },
-  recommended: {
-    price: 0.25,
-    accommodationQuality: 0.2,
-    location: 0.15,
-    transportComfort: 0.15,
-    usableTime: 0.1,
-    preferenceMatch: 0.15,
-  },
-  comfort: {
-    price: 0.05,
-    accommodationQuality: 0.3,
-    location: 0.25,
-    transportComfort: 0.25,
-    usableTime: 0.05,
-    preferenceMatch: 0.1,
-  },
+// Pesos de la propuesta equilibrada: los mismos de la sección 10.2.
+const BALANCED_WEIGHTS: Record<keyof ScoreBreakdown, number> = {
+  price: 0.25,
+  accommodationQuality: 0.2,
+  location: 0.15,
+  transportComfort: 0.15,
+  usableTime: 0.1,
+  preferenceMatch: 0.15,
 };
 
-const PROPOSAL_ORDER: ProposalType[] = ["economical", "recommended", "comfort"];
+// Pesos de la propuesta cómoda. El precio pesa CERO a propósito: es la
+// única de las tres que no debe premiarse por ser barata. Con el precio
+// dentro, aunque fuera al 5%, la cómoda seguía prefiriendo lo barato y
+// dejaba sin usar la mitad del presupuesto.
+const COMFORT_WEIGHTS: Record<keyof ScoreBreakdown, number> = {
+  price: 0,
+  accommodationQuality: 0.35,
+  location: 0.25,
+  transportComfort: 0.25,
+  usableTime: 0.05,
+  preferenceMatch: 0.1,
+};
 
 const PREFERENCE_LABELS: Record<TravelPreference, string> = {
   beach: "la playa",
@@ -180,26 +170,117 @@ async function buildProposal(
   };
 }
 
-// Sección 21 (Fase 8), pasos 7-8: elige económica/recomendada/confort
-// entre las combinaciones supervivientes (ya validadas y no dominadas),
-// evitando repetir la misma combinación en dos perfiles distintos.
+const cost = (scored: ScoredCombination) => scored.combination.budget.totalTripCost;
+
+// Elige el mejor según `compare`, prefiriendo los que NO repiten alojamiento
+// ya usado. Es una preferencia, no un filtro: si todos los candidatos
+// comparten hotel se devuelve el mejor igualmente, en vez de quedarse sin
+// propuesta.
+//
+// Importa cuando el presupuesto deja pocas opciones vivas: en una búsqueda
+// de 8 días para una persona con 2.000 € solo sobreviven 6 combinaciones, y
+// sin esto las tres propuestas salían con el mismo hotel y solo cambiaba el
+// vuelo.
+function bestPreferringNewHotel(
+  candidates: ScoredCombination[],
+  usedHotelIds: Set<string>,
+  compare: (a: ScoredCombination, b: ScoredCombination) => number,
+): ScoredCombination | undefined {
+  const fresh = candidates.filter((scored) => !usedHotelIds.has(scored.combination.accommodation.id));
+  return [...(fresh.length > 0 ? fresh : candidates)].sort(compare)[0];
+}
+
+// Sección 21 (Fase 8), pasos 7-8: elige económica / equilibrada / cómoda
+// entre las combinaciones supervivientes (ya validadas y no dominadas).
+//
+// Se eligen POR CONSTRUCCIÓN, no con tres ponderaciones que compiten entre
+// sí. Antes cada perfil ordenaba el mismo fondo con pesos distintos y se
+// quedaba con el primero, lo cual no garantizaba nada: el perfil económico
+// tenía un 45% de su peso en criterios que no son el precio, así que una
+// combinación algo más cara pero mejor en alojamiento o transporte le
+// ganaba. El resultado era que "Económico" salía costando MÁS que
+// "Equilibrado" — lo primero que ve el usuario, y contradice la etiqueta.
+//
+// Ahora el invariante económica <= equilibrada <= cómoda se cumple porque
+// cada una se busca dentro del tramo de precio que le corresponde:
+//
+//   económica  = la más barata del fondo
+//   cómoda     = la de mejor calidad ENTRE LAS QUE CUESTAN MÁS que la económica
+//   equilibrada = la mejor puntuada ENTRE LAS DOS
+//
+// Si los datos no dan para tres tramos distintos se devuelven menos
+// propuestas. Es preferible enseñar dos opciones honestas que tres mal
+// etiquetadas.
 export async function selectDiverseProposals(
   scoredCombinations: ScoredCombination[],
   context: SelectProposalsContext,
 ): Promise<TripProposal[]> {
-  const usedCombinationIds = new Set<string>();
+  if (scoredCombinations.length === 0) {
+    return [];
+  }
+
+  // 1. Económica: la más barata. A igual precio, la mejor puntuada.
+  const economical = [...scoredCombinations].sort(
+    (a, b) => cost(a) - cost(b) || calculateTripScore(b.scoreBreakdown) - calculateTripScore(a.scoreBreakdown),
+  )[0];
+
+  // 2. Cómoda: mejor calidad entre las que cuestan estrictamente más. A
+  //    igualdad de calidad gana la que más presupuesto aprovecha, que es lo
+  //    que evita que con 3.000 € se proponga el mismo hotel que con 1.500 €.
+  const usedHotelIds = new Set([economical.combination.accommodation.id]);
+
+  const comfort = bestPreferringNewHotel(
+    scoredCombinations.filter((scored) => cost(scored) > cost(economical)),
+    usedHotelIds,
+    (a, b) =>
+      weightedScore(b.scoreBreakdown, COMFORT_WEIGHTS) - weightedScore(a.scoreBreakdown, COMFORT_WEIGHTS) ||
+      cost(b) - cost(a),
+  );
+  if (comfort) usedHotelIds.add(comfort.combination.accommodation.id);
+
+  // 3. Equilibrada: la mejor puntuada dentro del tramo intermedio, y con un
+  //    nivel que tampoco baje. El precio por sí solo no basta: sin esto, la
+  //    equilibrada podía costar más que la económica y aun así llevar un
+  //    hotel peor valorado, que es exactamente lo que la etiqueta niega.
+  //
+  //    "Nivel" se mide con los mismos pesos de calidad de la cómoda, que es
+  //    la escala en la que están ordenadas las tres.
+  const quality = (scored: ScoredCombination) => weightedScore(scored.scoreBreakdown, COMFORT_WEIGHTS);
+  const qualityFloor = quality(economical);
+  const qualityCeiling = comfort ? quality(comfort) : Number.POSITIVE_INFINITY;
+
+  const upperBound = comfort ? cost(comfort) : Number.POSITIVE_INFINITY;
+  const inMiddleBand = scoredCombinations.filter(
+    (scored) =>
+      scored.combination.id !== economical.combination.id &&
+      scored.combination.id !== comfort?.combination.id &&
+      cost(scored) >= cost(economical) &&
+      cost(scored) <= upperBound,
+  );
+
+  // El nivel manda sobre el hotel distinto: es preferible repetir
+  // alojamiento a etiquetar como "equilibrado" algo peor que lo económico.
+  // Si ninguna candidata cumple el escalón de calidad, se relaja antes que
+  // quedarse sin propuesta intermedia.
+  const withinQuality = inMiddleBand.filter(
+    (scored) => quality(scored) >= qualityFloor && quality(scored) <= qualityCeiling,
+  );
+
+  const recommended = bestPreferringNewHotel(
+    withinQuality.length > 0 ? withinQuality : inMiddleBand,
+    usedHotelIds,
+    (a, b) => weightedScore(b.scoreBreakdown, BALANCED_WEIGHTS) - weightedScore(a.scoreBreakdown, BALANCED_WEIGHTS),
+  );
+
+  const chosen: { type: ProposalType; scored: ScoredCombination }[] = [
+    { type: "economical", scored: economical },
+    ...(recommended ? [{ type: "recommended" as const, scored: recommended }] : []),
+    ...(comfort ? [{ type: "comfort" as const, scored: comfort }] : []),
+  ];
+
   const proposals: TripProposal[] = [];
-
-  for (const type of PROPOSAL_ORDER) {
-    const weights = PROFILE_WEIGHTS[type];
-    const winner = [...scoredCombinations]
-      .filter((scored) => !usedCombinationIds.has(scored.combination.id))
-      .sort((a, b) => weightedScore(b.scoreBreakdown, weights) - weightedScore(a.scoreBreakdown, weights))[0];
-
-    if (!winner) continue; // no quedan combinaciones distintas disponibles para este perfil
-
-    usedCombinationIds.add(winner.combination.id);
-    proposals.push(await buildProposal(type, winner, context));
+  for (const { type, scored } of chosen) {
+    proposals.push(await buildProposal(type, scored, context));
   }
 
   [...proposals]

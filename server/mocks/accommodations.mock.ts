@@ -16,10 +16,23 @@ const AVAILABLE_AMENITIES = [
   "Vistas panorámicas",
 ];
 
-function pickAmenities(random: () => number): string[] {
-  const count = 1 + Math.floor(random() * AVAILABLE_AMENITIES.length);
+// El número de servicios sube con el nivel del hotel: uno de 35 €/noche no
+// tiene spa ni gimnasio.
+function pickAmenities(random: () => number, tier: number): string[] {
+  const count = Math.max(1, Math.round(1 + tier * (AVAILABLE_AMENITIES.length - 1)));
   const shuffled = [...AVAILABLE_AMENITIES].sort(() => random() - 0.5);
   return shuffled.slice(0, count);
+}
+
+// Ruido acotado alrededor de un valor, para que la relación precio-calidad
+// no sea una recta perfecta: entre hoteles del mismo precio también hay
+// mejores y peores.
+function jitter(value: number, amount: number, random: () => number): number {
+  return value + (random() - 0.5) * 2 * amount;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 const MIN_OFFERS = 15;
@@ -41,8 +54,25 @@ export function generateMockAccommodations(request: AccommodationSearchRequest):
   const offers: AccommodationOffer[] = [];
   for (let i = 0; i < count; i++) {
     const random = createSeededRandom(seed + i * 131 + 1);
-    const pricePerNight = Math.round(35 + random() * 220);
-    const coordinates = jitterCoordinates(center, random, 0.12);
+
+    // Un único "nivel" 0-1 del que cuelga todo lo demás.
+    //
+    // Antes el precio y la valoración eran dos tiradas independientes, así
+    // que pagar más no compraba nada: un hotel de 255 €/noche podía tener
+    // peor nota, estar más lejos y ofrecer menos servicios que uno de 40 €.
+    // El motor lo detectaba y hacía lo correcto —con 3.000 € de presupuesto
+    // seguía proponiendo hoteles baratos, porque gastarlos no mejoraba el
+    // viaje— pero el resultado no tenía ningún sentido para quien lo leía.
+    //
+    // Un hotel real cuesta más porque está más céntrico, mejor valorado y
+    // con más servicios. El mock tiene que ser un sustituto verosímil, y
+    // esto es lo que hace que las tres propuestas signifiquen algo.
+    const tier = random();
+
+    const pricePerNight = Math.round(clamp(jitter(35 + tier * 220, 18, random), 30, 280));
+    // Los mejores están más céntricos: el radio de dispersión se estrecha
+    // según sube el nivel.
+    const coordinates = jitterCoordinates(center, random, 0.16 - tier * 0.11);
 
     offers.push({
       id: `hotel-${seed}-${i}`,
@@ -50,7 +80,7 @@ export function generateMockAccommodations(request: AccommodationSearchRequest):
       name: `${pick(NAME_PREFIXES, random)} ${request.destination} ${pick(NAME_SUFFIXES, random)}`,
       totalPrice: pricePerNight * nights,
       currency: "EUR",
-      rating: Math.round((3 + random() * 2) * 10) / 10,
+      rating: Math.round(clamp(jitter(3 + tier * 2, 0.35, random), 1, 5) * 10) / 10,
       reviewCount: Math.round(20 + random() * 2000),
       latitude: coordinates.lat,
       longitude: coordinates.lng,
@@ -59,9 +89,9 @@ export function generateMockAccommodations(request: AccommodationSearchRequest):
       // contradecir a las propias coordenadas del hotel (y al mapa).
       distanceToCenterKm:
         Math.round(haversineDistanceKm(center.lat, center.lng, coordinates.lat, coordinates.lng) * 10) / 10,
-      breakfastIncluded: random() > 0.5,
-      freeCancellation: random() > 0.4,
-      amenities: pickAmenities(random),
+      breakfastIncluded: tier > 0.4,
+      freeCancellation: tier > 0.3,
+      amenities: pickAmenities(random, tier),
       capacity: travelers + Math.floor(random() * 3),
       fetchedAt: new Date().toISOString(),
     });

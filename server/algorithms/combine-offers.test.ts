@@ -147,6 +147,62 @@ describe("combineOffers · selección de actividades", () => {
     expect(combination.activities.some((a) => a.id === "playa-0")).toBe(false);
   });
 
+  // Cada combinación elige sus actividades según dónde está SU hotel. Antes
+  // se seleccionaban una sola vez fuera de los bucles y las 285
+  // combinaciones compartían literalmente el mismo array: las tres
+  // propuestas salían con el mismo itinerario.
+  it("cada hotel se lleva las actividades que tiene cerca", () => {
+    const norte = { ...accommodation, id: "hotel-norte", latitude: 41.95, longitude: 12.5 };
+    const sur = { ...accommodation, id: "hotel-sur", latitude: 41.83, longitude: 12.5 };
+    const cerca = (id: string, lat: number) =>
+      ({ ...activity(id, { culture: 3 }), latitude: lat, longitude: 12.5 }) as ActivityCandidate;
+
+    const combos = combineOffers(
+      [flight],
+      [norte, sur],
+      [cerca("norte-1", 41.951), cerca("norte-2", 41.949), cerca("sur-1", 41.831), cerca("sur-2", 41.829)],
+      { travelers: 2, days: 2, userBudget: 5000, preferences: profile({ culture: 3 }) },
+    );
+
+    const deNorte = combos.find((c) => c.accommodation.id === "hotel-norte")!.activities.map((a) => a.id);
+    const deSur = combos.find((c) => c.accommodation.id === "hotel-sur")!.activities.map((a) => a.id);
+
+    expect(deNorte).not.toEqual(deSur);
+    expect(deNorte[0]).toMatch(/^norte-/);
+    expect(deSur[0]).toMatch(/^sur-/);
+  });
+
+  it("el coste de actividades se recalcula con la selección de cada hotel", () => {
+    const norte = { ...accommodation, id: "hotel-norte", latitude: 41.95, longitude: 12.5 };
+    const sur = { ...accommodation, id: "hotel-sur", latitude: 41.83, longitude: 12.5 };
+    // Tienen que sobrar candidatas: el selector coge un mínimo de 3, así que
+    // con solo dos actividades ambos hoteles se llevarían las mismas y el
+    // coste saldría idéntico sin que eso pruebe nada.
+    const caros = [0, 1, 2].map((i) => ({
+      ...activity(`norte-caro-${i}`, { culture: 3 }),
+      latitude: 41.95 + i / 1000,
+      longitude: 12.5,
+      pricePerPerson: 80,
+    }));
+    const baratos = [0, 1, 2].map((i) => ({
+      ...activity(`sur-barato-${i}`, { culture: 3 }),
+      latitude: 41.83 + i / 1000,
+      longitude: 12.5,
+      pricePerPerson: 5,
+    }));
+
+    const combos = combineOffers([flight], [norte, sur], [...caros, ...baratos], {
+      travelers: 2,
+      days: 1,
+      userBudget: 5000,
+      preferences: profile({ culture: 3 }),
+    });
+
+    const costeNorte = combos.find((c) => c.accommodation.id === "hotel-norte")!.budget.activityCost;
+    const costeSur = combos.find((c) => c.accommodation.id === "hotel-sur")!.budget.activityCost;
+    expect(costeNorte).not.toBe(costeSur);
+  });
+
   it("descarta las combinaciones que no caben en el presupuesto", () => {
     const combinations = combineOffers([flight], [accommodation], CULTURA_ABUNDANTE, {
       travelers: 2,

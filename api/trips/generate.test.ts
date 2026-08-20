@@ -174,6 +174,48 @@ describe("POST /api/trips/generate", () => {
     expect(visitas, "el viaje de prueba debería tener visitas que comprobar").toBeGreaterThan(0);
   });
 
+  // El invariante que el usuario lee primero en la comparativa. Antes se
+  // rompía: "Económico 1138€" encima de "Equilibrado 1118€".
+  it("las propuestas van de menos a más precio", async () => {
+    const proposals = (await generar(PETICION)).payload.proposals as TripProposal[];
+    const costes = proposals.map((p) => p.totalCost);
+    expect(costes, `orden roto: ${costes.join(" → ")}`).toEqual([...costes].sort((a, b) => a - b));
+  });
+
+  // "En precio y en nivel". El nivel se mide en la misma escala compuesta
+  // con la que se eligen: alojamiento, ubicación y transporte.
+  it("el nivel tampoco baja al subir de categoría", async () => {
+    const proposals = (await generar(PETICION)).payload.proposals as TripProposal[];
+    const W = { accommodationQuality: 0.35, location: 0.25, transportComfort: 0.25, usableTime: 0.05, preferenceMatch: 0.1 };
+    const niveles = proposals.map((p) =>
+      (Object.keys(W) as (keyof typeof W)[]).reduce((t, k) => t + p.scoreBreakdown[k] * W[k], 0),
+    );
+    expect(niveles.map((n) => Math.round(n))).toEqual([...niveles].sort((a, b) => a - b).map((n) => Math.round(n)));
+  });
+
+  it("cada propuesta trae su propio itinerario", async () => {
+    const proposals = (await generar(PETICION)).payload.proposals as TripProposal[];
+    const firmas = proposals.map((p) =>
+      p.itinerary
+        .flatMap((d) => d.items)
+        .filter((i) => i.type === "visit")
+        .map((i) => i.title)
+        .sort()
+        .join("|"),
+    );
+    expect(new Set(firmas).size, "las tres propuestas comparten itinerario").toBe(proposals.length);
+  });
+
+  // El síntoma que se notaba con datos simulados: poner 3.000 € y recibir
+  // los mismos hoteles baratos que con 1.500 €.
+  it("con más presupuesto, la propuesta cómoda gasta más", async () => {
+    const pobre = (await generar({ ...PETICION, budget: 1200 })).payload.proposals as TripProposal[];
+    const rica = (await generar({ ...PETICION, budget: 3000 })).payload.proposals as TripProposal[];
+
+    const masCara = (ps: TripProposal[]) => Math.max(...ps.map((p) => p.totalCost));
+    expect(masCara(rica)).toBeGreaterThan(masCara(pobre));
+  });
+
   it("es determinista: la misma petición da el mismo resultado", async () => {
     const primera = (await generar(PETICION)).payload.proposals as TripProposal[];
     const segunda = (await generar(PETICION)).payload.proposals as TripProposal[];

@@ -9,6 +9,7 @@ import type {
   TripCombination,
 } from "../types/trip.js";
 import { ALL_PREFERENCES } from "../utils/preferences.js";
+import { haversineDistanceKm } from "../utils/geo.js";
 import { allocateBudget } from "./allocate-budget.js";
 import { normalizeScore } from "./normalize-score.js";
 import { calculatePreferenceScore } from "./score-preferences.js";
@@ -56,65 +57,98 @@ function round2(value: number): number {
 // Sección 6.1 (Fase 9): "cultura alta -> mayor peso de patrimonio y
 // museos", "naturaleza alta -> excursiones, parques y zonas verdes",
 // "compras alta -> mercados y zonas comerciales", "playa alta -> favorecer
-// litoral y actividades acuáticas". Ordenar por calculatePreferenceScore()
-// aplica las cuatro reglas a la vez: una actividad de categoría "playa"
-// solo sube en el ranking si el usuario puso beach > 0, y sube más cuanto
-// mayor sea ese nivel — exactamente el efecto que pide la sección 6.1.
+// litoral y actividades acuáticas". calculatePreferenceScore() aplica las
+// cuatro reglas a la vez: una actividad de categoría "playa" solo sube en
+// el ranking si el usuario puso beach > 0, y sube más cuanto mayor sea ese
+// nivel.
 //
-// El reparto es por cupos proporcionales al peso de cada preferencia, no un
-// "coger los N mejores" a secas. Ordenar y cortar parecía equivalente
-// mientras las actividades venían del mock, que solo tenía dos plantillas
-// por temática: nunca había suficientes de una sola para copar la lista.
-//
-// Con sitios reales sí las hay. Roma tiene catorce actividades de cultura
-// pura, así que quien pidiera cultura 3 y gastronomía 2 se llevaba diez
-// museos e iglesias y CERO gastronomía: el perfil agregado de la
-// combinación quedaba con gastronomy 0, su preferenceMatch caía por debajo
-// del mínimo de la sección 10.4 y se descartaban todas las combinaciones.
-// Un viaje de cinco días con diez museos tampoco es lo que pidió, aunque
-// hubiera pasado el umbral.
-//
-// Reparte primero un cupo por preferencia (proporcional a su peso, mínimo
-// uno) y solo después rellena lo que falte con las mejor puntuadas. Las
-// preferencias con peso 0 no reciben cupo: siguen sin aparecer.
-function selectTopActivities(
+// La afinidad se calcula UNA vez para todo el fondo de actividades, no por
+// combinación. Depende solo de las preferencias del usuario, que no cambian
+// entre combinaciones: recalcularla 285 veces daría 285 veces el mismo
+// número. Antes se calculaba además dentro del comparador de un sort, o sea
+// dos veces por comparación.
+interface RankedActivity {
+  activity: ActivityCandidate;
+  affinity: number;
+}
+
+export function rankActivitiesByAffinity(
   activities: ActivityCandidate[],
   preferences: PreferenceProfile,
+): RankedActivity[] {
+  return activities
+    .map((activity) => ({ activity, affinity: calculatePreferenceScore(preferences, activity.profile) }))
+    .sort((a, b) => b.affinity - a.affinity);
+}
+
+// Cuánto puede penalizar la lejanía al hotel, en puntos sobre los 100 de la
+// escala de afinidad, y a partir de qué distancia se aplica el máximo.
+const PROXIMITY_PENALTY = 30;
+const PROXIMITY_CAP_KM = 8;
+
+// Lo que hace que dos propuestas tengan itinerarios distintos: cada
+// combinación elige sus actividades según DÓNDE ESTÁ SU HOTEL. No es
+// variación por variar — si te alojas en Trastevere, tus planes deberían
+// estar en Trastevere y no al otro lado del Tíber. Encaja además con
+// distributePlacesAcrossDays(), que agrupa por proximidad: los días salen
+// más compactos y con menos desplazamiento.
+//
+// Es una pasada O(N) sobre el fondo ya ordenado, más un sort de números ya
+// calculados. Nada de recalcular afinidades.
+function selectActivitiesForHotel(
+  ranked: RankedActivity[],
+  preferences: PreferenceProfile,
   days: number,
+  hotel: { latitude: number; longitude: number },
 ): ActivityCandidate[] {
-  const count = Math.min(activities.length, Math.max(MIN_ACTIVITIES_PER_COMBINATION, days * ACTIVITIES_PER_DAY));
-  const byAffinity = [...activities].sort(
-    (a, b) => calculatePreferenceScore(preferences, b.profile) - calculatePreferenceScore(preferences, a.profile),
-  );
+  const count = Math.min(ranked.length, Math.max(MIN_ACTIVITIES_PER_COMBINATION, days * ACTIVITIES_PER_DAY));
+
+  const byProximity = ranked
+    .map((entry) => {
+      const distanceKm = haversineDistanceKm(
+        hotel.latitude,
+        hotel.longitude,
+        entry.activity.latitude,
+        entry.activity.longitude,
+      );
+      const penalty = (Math.min(distanceKm, PROXIMITY_CAP_KM) / PROXIMITY_CAP_KM) * PROXIMITY_PENALTY;
+      return { ...entry, score: entry.affinity - penalty };
+    })
+    .sort((a, b) => b.score - a.score);
 
   const wanted = ALL_PREFERENCES.filter((key) => preferences[key] > 0);
   const totalWeight = wanted.reduce((sum, key) => sum + preferences[key], 0);
   if (totalWeight === 0) {
-    return byAffinity.slice(0, count);
+    return byProximity.slice(0, count).map((entry) => entry.activity);
   }
 
   const selected: ActivityCandidate[] = [];
   const taken = new Set<string>();
 
+  // El reparto por cupos es lo que impide que una sola categoría se coma el
+  // itinerario cuando hay candidatas de sobra: Roma tiene catorce
+  // actividades de cultura pura, y quien pidiera cultura 3 y gastronomía 2
+  // se llevaba diez museos y cero gastronomía.
+  //
   // De más peso a menos: si al redondear los cupos sobran plazas, se las
   // queda lo que el usuario ha pedido con más fuerza.
   for (const key of [...wanted].sort((a, b) => preferences[b] - preferences[a])) {
     const quota = Math.max(1, Math.round((count * preferences[key]) / totalWeight));
     let used = 0;
-    for (const activity of byAffinity) {
+    for (const entry of byProximity) {
       if (used >= quota || selected.length >= count) break;
-      if (taken.has(activity.id) || activity.profile[key] === 0) continue;
-      taken.add(activity.id);
-      selected.push(activity);
+      if (taken.has(entry.activity.id) || entry.activity.profile[key] === 0) continue;
+      taken.add(entry.activity.id);
+      selected.push(entry.activity);
       used++;
     }
   }
 
-  for (const activity of byAffinity) {
+  for (const entry of byProximity) {
     if (selected.length >= count) break;
-    if (taken.has(activity.id)) continue;
-    taken.add(activity.id);
-    selected.push(activity);
+    if (taken.has(entry.activity.id)) continue;
+    taken.add(entry.activity.id);
+    selected.push(entry.activity);
   }
 
   return selected;
@@ -154,14 +188,30 @@ export function combineOffers(
   activities: ActivityCandidate[],
   context: CombineOffersContext,
 ): TripCombination[] {
-  const selectedActivities = selectTopActivities(activities, context.preferences, context.days);
-  const activityCost = round2(
-    selectedActivities.reduce((sum, activity) => sum + (activity.pricePerPerson ?? 0), 0) * context.travelers,
-  );
+  const ranked = rankActivitiesByAffinity(activities, context.preferences);
+
+  // Las actividades se eligen por hotel, así que el coste también cambia por
+  // combinación. Se memoriza por hotel: el mismo alojamiento aparece en
+  // tantas combinaciones como vuelos haya (unos 15), y su selección es la
+  // misma en todas.
+  const byHotel = new Map<string, { activities: ActivityCandidate[]; cost: number }>();
+  const selectionFor = (accommodation: AccommodationOffer) => {
+    const cached = byHotel.get(accommodation.id);
+    if (cached) return cached;
+
+    const selectedActivities = selectActivitiesForHotel(ranked, context.preferences, context.days, accommodation);
+    const cost = round2(
+      selectedActivities.reduce((sum, activity) => sum + (activity.pricePerPerson ?? 0), 0) * context.travelers,
+    );
+    const entry = { activities: selectedActivities, cost };
+    byHotel.set(accommodation.id, entry);
+    return entry;
+  };
 
   const combinations: TripCombination[] = [];
   for (const flight of flights) {
     for (const accommodation of accommodations) {
+      const { activities: selectedActivities, cost: activityCost } = selectionFor(accommodation);
       const baseBudget = allocateBudget({
         userBudget: context.userBudget,
         travelers: context.travelers,
