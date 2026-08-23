@@ -1,6 +1,7 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { SearchParams, TripProposal } from "../../types";
 import { formatDate } from "../../utils/dates";
+import { formatDistance } from "../../utils/format";
 import { TIER_THEME } from "../../constants/tierTheme";
 import { getEffectiveRestaurant, getEffectiveText } from "../../utils/itineraryEdits";
 
@@ -248,11 +249,15 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
 
         <View style={styles.summarySection}>
           <Text style={styles.summaryHeading}>Alojamiento</Text>
-          <Text style={styles.summaryLine}>
-            {hotel.name} {"★".repeat(hotel.stars)}
-          </Text>
+          {/* Sin las estrellas derivadas de la valoración: eran el mismo
+              número dos veces. En su lugar, lo que el PDF no decía y quien lo
+              lleva impreso en el aeropuerto agradece saber. */}
+          <Text style={styles.summaryLine}>{hotel.name} (alojamiento simulado)</Text>
           <Text style={styles.summarySubline}>
-            Valoración {hotel.rating.toFixed(1)} / 5 · {hotel.amenities.join(" · ")}
+            Valoración {hotel.rating.toFixed(1)} / 5
+            {hotel.distanceToCenterKm !== undefined ? ` · A ${formatDistance(hotel.distanceToCenterKm)} del centro` : ""}
+            {hotel.freeCancellation === false ? " · Sin cancelación gratuita" : ""}
+            {hotel.amenities.length > 0 ? ` · ${hotel.amenities.join(" · ")}` : ""}
           </Text>
           <Text style={styles.summarySubline}>
             {hotel.pricePerNight}€ / noche · Total: {hotel.totalPrice}€

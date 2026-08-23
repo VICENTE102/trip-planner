@@ -17,6 +17,11 @@ export interface ItineraryItem {
   durationMinutes: number;
   travelMinutesFromPrevious?: number;
   transportMode?: string;
+  /**
+   * Si `travelMinutesFromPrevious` es una estimación o una ruta real medida
+   * por OpenRouteService. Ver TravelMatrixEntry.estimated.
+   */
+  travelEstimated?: boolean;
   costPerPerson?: number;
   bookingRequired?: boolean;
   bookingUrl?: string;

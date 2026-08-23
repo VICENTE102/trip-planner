@@ -51,13 +51,14 @@ function baseContext(overrides: Partial<Parameters<typeof scheduleDayActivities>
 
 // Un tramo de la matriz con los minutos y el modo que se quieran probar.
 const leg =
-  (travelMinutes: number, transportMode: TravelMatrixEntry["transportMode"] = "walk") =>
+  (travelMinutes: number, transportMode: TravelMatrixEntry["transportMode"] = "walk", estimated = false) =>
   (fromId: string, toId: string): TravelMatrixEntry => ({
     fromId,
     toId,
     distanceKm: travelMinutes / 12,
     travelMinutes,
     transportMode,
+    estimated,
   });
 
 const minutes = (item: ItineraryItem) => ({

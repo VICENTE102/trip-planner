@@ -6,6 +6,7 @@ import { mockFlightProvider } from "../providers/mock-flight.provider.js";
 import { mockAccommodationProvider } from "../providers/mock-accommodation.provider.js";
 import { placesProvider } from "../providers/places.provider.js";
 import { buildScoreBreakdown, combineOffers } from "../algorithms/combine-offers.js";
+import { analyzeBudgetUnlock, type BudgetUnlock } from "../algorithms/budget-unlock.js";
 import { passesQualityThresholds, validateCombination, validateItinerary, repairInvalidItinerary } from "../algorithms/validate-trip.js";
 import { filterDominatedOptions } from "../algorithms/pareto-filter.js";
 import { selectDiverseProposals } from "../algorithms/select-proposals.js";
@@ -24,6 +25,10 @@ export interface GenerateTripResult {
   // ("la opción más económica son 962 €") en vez de un "no hay resultados"
   // seco. null solo si no se pudo formar ninguna combinación.
   cheapestTotalCost: number | null;
+  // Qué haría falta para que haya alternativas de verdad, cuando las que hay
+  // no dan para tres propuestas distintas. null cuando ya hay variedad o
+  // cuando ningún aumento razonable la abre.
+  budgetUnlock: BudgetUnlock | null;
   providerSearches: ProviderSearchLog[];
 }
 
@@ -228,11 +233,27 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     ? Math.round(Math.min(...combinations.map((combination) => combination.budget.totalTripCost)))
     : null;
 
+  // Solo se calcula cuando el resultado es pobre: menos de tres propuestas, o
+  // tres que comparten alojamiento. Si hay variedad no hay nada que decir, y
+  // no tiene sentido gastar el cálculo en la mayoría de búsquedas, que salen
+  // bien. No hace ninguna llamada de red: reutiliza las ofertas ya pedidas.
+  const distinctHotels = new Set(proposals.map((proposal) => proposal.accommodation.id)).size;
+  const budgetUnlock =
+    distinctHotels > 1 && proposals.length >= 3
+      ? null
+      : analyzeBudgetUnlock(flights, accommodations, activities, {
+          travelers,
+          days,
+          userBudget: request.budget,
+          preferences,
+        });
+
   return {
     proposals,
     evaluatedCombinations: combinations.length,
     discardedCombinations,
     cheapestTotalCost,
+    budgetUnlock,
     providerSearches,
   };
 }

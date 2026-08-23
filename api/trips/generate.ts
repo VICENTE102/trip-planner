@@ -39,8 +39,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
-    const { proposals, evaluatedCombinations, discardedCombinations, cheapestTotalCost, providerSearches } =
-      await generateTripProposals(parsed.data);
+    const {
+      proposals,
+      evaluatedCombinations,
+      discardedCombinations,
+      cheapestTotalCost,
+      budgetUnlock,
+      providerSearches,
+    } = await generateTripProposals(parsed.data);
 
     await persistTripGeneration({
       requestId,
@@ -57,6 +63,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         evaluatedCombinations,
         discardedCombinations,
         cheapestTotalCost,
+        // Cuánto haría falta para que haya alternativas reales, cuando las
+        // propuestas devueltas comparten alojamiento o no llegan a tres.
+        budgetUnlock,
         // Aviso global del producto: aplica a las tres propuestas por igual,
         // así que se dice una vez y no una por propuesta.
         disclaimer: SIMULATED_DATA_DISCLAIMER,

@@ -1,4 +1,5 @@
 import type { Itinerary, SearchParams } from "../types";
+import { DataBadge } from "./DataBadge";
 import { Icon } from "./Icon";
 import { ExternalLinkButton } from "./ExternalLinkButton";
 import { getFlightLink } from "../services/deepLinks";
@@ -30,9 +31,15 @@ export function FlightSummary({ itinerary, searchParams }: FlightSummaryProps) {
 
   return (
     <div className="rounded-xl border border-ink-200 bg-white p-4 text-sm">
-      <p className="flex items-center gap-1.5 font-semibold text-ink-900">
-        <Icon name="plane" size={16} className="text-sunset-500" />
-        Vuelos (simulados)
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold text-ink-900">
+        <span className="flex items-center gap-1.5">
+          <Icon name="plane" size={16} className="text-sunset-500" />
+          Vuelos
+        </span>
+        {/* "(simulados)" entre paréntesis en el título se leía como un matiz.
+            La marca dice lo mismo con el peso que le corresponde y, al
+            enlazar a /fuentes, explica hasta dónde llega. */}
+        <DataBadge confidence="simulado" linkToSources />
       </p>
       <p className="mt-2 text-ink-700">
         <span className="font-semibold text-ink-900">Ida</span> · {outboundFlight.airline} ·{" "}

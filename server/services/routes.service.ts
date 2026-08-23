@@ -64,18 +64,31 @@ function entryFromRealLeg(
   distanceKm: number,
 ): TravelMatrixEntry {
   const walkMinutes = toMinutes(durationSeconds);
+  // Andando es el único caso en que el número NO es una estimación: ORS lo ha
+  // medido sobre el callejero real.
+  const realWalk: TravelMatrixEntry = {
+    fromId,
+    toId,
+    distanceKm,
+    travelMinutes: walkMinutes,
+    transportMode: "walk",
+    estimated: false,
+  };
+
   if (walkMinutes <= WALK_CAP_MINUTES) {
-    return { fromId, toId, distanceKm, travelMinutes: walkMinutes, transportMode: "walk" };
+    return realWalk;
   }
 
   const transitMinutes = Math.round(TRANSIT_ACCESS_MINUTES + (distanceKm / TRANSIT_SPEED_KMH) * 60);
   // Si la estimación en transporte sale peor que ir andando, se anda: es una
   // opción real y además es el dato que sí conocemos de verdad.
   if (transitMinutes >= walkMinutes) {
-    return { fromId, toId, distanceKm, travelMinutes: walkMinutes, transportMode: "walk" };
+    return realWalk;
   }
 
-  return { fromId, toId, distanceKm, travelMinutes: transitMinutes, transportMode: "transit" };
+  // Distancia real, tiempo supuesto: ORS no da transporte público, así que
+  // esto sigue siendo una estimación por mucho que parta de un dato medido.
+  return { fromId, toId, distanceKm, travelMinutes: transitMinutes, transportMode: "transit", estimated: true };
 }
 
 // Devuelve la matriz de desplazamientos entre todos los puntos, resolviendo

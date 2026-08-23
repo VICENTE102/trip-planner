@@ -27,6 +27,17 @@ export interface SearchParams {
   preferences: Preference[];
 }
 
+// De dónde sale un dato, en el único vocabulario que la interfaz necesita:
+//
+//   real      el sitio existe y está donde dice (Overture Maps), o el tiempo
+//             se ha medido sobre el callejero (OpenRouteService)
+//   estimado  calculado a partir de otra cosa, no consultado a nadie
+//   simulado  generado por la app; no corresponde a nada que exista
+//
+// Lo que hace falta para que un usuario distinga el Museo Nazionale Etrusco,
+// que existe, del "Hotel Roma Jardín", que no.
+export type DataConfidence = "real" | "estimado" | "simulado";
+
 export interface Hotel {
   id: string;
   name: string;
@@ -34,9 +45,13 @@ export interface Hotel {
   pricePerNight: number;
   totalPrice: number;
   rating: number; // 0-5
-  stars: number; // 1-5
   amenities: string[];
   imageUrl?: string;
+  // Datos que el motor ya calculaba y la ficha no enseñaba. Opcionales
+  // porque el generador antiguo del cliente no los tiene.
+  distanceToCenterKm?: number;
+  freeCancellation?: boolean;
+  breakfastIncluded?: boolean;
 }
 
 export interface Flight {
@@ -67,6 +82,16 @@ export interface DayStop {
   text: string;
   lat: number;
   lng: number;
+  /** "real" para los sitios de Overture; "simulado" para los inventados. */
+  verification?: DataConfidence;
+  /** Web oficial del sitio, cuando Overture la tiene. */
+  website?: string;
+  // Minutos desde la parada anterior, y si son una ruta medida o una
+  // estimación. Los calculaba el motor desde el Paso 5 y no se enseñaban en
+  // ninguna parte: solo movían la hora de inicio de cada visita.
+  travelMinutes?: number;
+  transportMode?: "walk" | "transit";
+  travelEstimated?: boolean;
 }
 
 // Capa de ediciones del usuario sobre un día generado. Nunca sobrescribe los
@@ -105,9 +130,11 @@ export interface ItineraryDay {
   afternoon: string;
   afternoonActivityId: string;
   night: string;
-  // Coordenadas ficticias y deterministas (ver src/utils/geo.ts) para pintar
-  // el mapa de "Día a día" mientras no hay coordenadas reales.
   stops: DayStop[];
+  // Procedencia de los sitios de ESTE día, para poder marcarlo de un vistazo.
+  // "real" solo si todas sus visitas vienen de un proveedor real: basta una
+  // inventada para que la etiqueta deje de ser cierta.
+  placesVerification?: DataConfidence;
   edits?: DayEdits;
 }
 
@@ -158,10 +185,22 @@ export interface TripProposal {
   warnings: string[];
 }
 
+// Qué haría falta para tener alternativas de verdad. Llega del motor porque
+// el coste de un viaje depende del presupuesto (allocateBudget reparte tres
+// partidas como porcentaje de lo que pidió el usuario), así que "cuántas
+// opciones se abrirían con 300 € más" no se puede calcular aquí sin duplicar
+// el reparto y el validador.
+export interface BudgetUnlock {
+  extraBudget: number;
+  unlockedOptions: number;
+  currentOptions: number;
+}
+
 export interface SearchResult {
   searchParams: SearchParams;
   /** Aviso global del producto, válido para todas las propuestas. */
   disclaimer?: string;
+  budgetUnlock?: BudgetUnlock | null;
   proposals: TripProposal[];
 }
 

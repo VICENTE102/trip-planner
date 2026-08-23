@@ -302,6 +302,7 @@ export function scheduleDayActivities(places: ActivityCandidate[], context: Sche
         startMinutes: travelStartMinutes,
         travelMinutesFromPrevious: travelMinutes,
         transportMode: leg?.transportMode,
+        travelEstimated: leg?.estimated ?? true,
         verificationStatus: "unverified",
       });
     }
@@ -315,6 +316,12 @@ export function scheduleDayActivities(places: ActivityCandidate[], context: Sche
       longitude: place.longitude,
       durationMinutes: place.estimatedDurationMinutes,
       travelMinutesFromPrevious: travelMinutes,
+      // Solo tiene sentido calificar la procedencia del dato si hay
+      // desplazamiento que calificar: la primera visita del día sale del
+      // hotel sin tramo previo.
+      ...(travelMinutes > 0
+        ? { transportMode: leg?.transportMode, travelEstimated: leg?.estimated ?? true }
+        : {}),
       costPerPerson: place.pricePerPerson,
       bookingRequired: place.bookingRequired,
       bookingUrl: place.bookingUrl,

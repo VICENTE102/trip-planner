@@ -224,10 +224,23 @@ describe("POST /api/trips/generate", () => {
     const metadata = payload.metadata as { disclaimer?: string };
     const proposals = payload.proposals as TripProposal[];
 
-    expect(metadata.disclaimer).toMatch(/Datos simulados/);
+    expect(metadata.disclaimer).toBeTruthy();
     for (const p of proposals) {
-      expect(p.warnings.some((w) => w.includes("Datos simulados"))).toBe(false);
+      expect(p.warnings.some((w) => /simulad/i.test(w))).toBe(false);
     }
+  });
+
+  // El descargo decía que las actividades eran simuladas. No lo son: los
+  // sitios vienen de Overture con nombre y coordenadas reales, y son lo más
+  // sólido que tiene la app. Acusarlas de inventadas escondía justo lo bueno,
+  // y dejaba a los vuelos y al hotel con la misma credibilidad que un museo.
+  it("el descargo señala lo simulado sin acusar a las actividades", async () => {
+    const metadata = (await generar(PETICION)).payload.metadata as { disclaimer?: string };
+
+    expect(metadata.disclaimer).toMatch(/simulad/i);
+    expect(metadata.disclaimer).toMatch(/vuelos/i);
+    expect(metadata.disclaimer).toMatch(/alojamiento/i);
+    expect(metadata.disclaimer, "vuelve a llamar simuladas a las actividades").not.toMatch(/actividades/i);
   });
 
   it("cada propuesta trae razones propias que explican su precio", async () => {
@@ -241,6 +254,79 @@ describe("POST /api/trips/generate", () => {
     // exactamente lo mismo, la comparativa volvería a no comparar nada.
     const firmas = proposals.map((p) => p.reasons.join("|"));
     expect(new Set(firmas).size).toBe(proposals.length);
+  });
+
+  // 7 noches en Roma con el presupuesto justo. Solo un hotel entra, así que
+  // las tres propuestas salían con él y cambiaba únicamente el vuelo:
+  // "Equilibrado 1.629 €" y "Cómodo 1.639 €" eran el mismo alojamiento, el
+  // mismo tipo de vuelo y diez euros. Dos cajas para decir una sola cosa.
+  //
+  // Estas fechas y este presupuesto no son decorativos: con los mocks
+  // sembrados son los que reproducen el duplicado. Cambiarlos hace que la
+  // prueba pase sin comprobar nada.
+  const PRESUPUESTO_JUSTO = {
+    ...PETICION,
+    departureDate: "2026-08-24",
+    returnDate: "2026-08-31",
+    travelers: { adults: 1, children: 0 },
+  };
+
+  it("no ofrece dos veces el mismo viaje con etiquetas distintas", async () => {
+    const proposals = (await generar(PRESUPUESTO_JUSTO)).payload.proposals as TripProposal[];
+
+    // Sin la comprobación de que hay algo que colapsar, esta prueba pasaría
+    // igual el día que el fondo de ofertas cambie y deje de haber repetidos.
+    expect(proposals.length, "no hay propuestas que comparar").toBeGreaterThan(1);
+
+    for (const a of proposals) {
+      for (const b of proposals) {
+        if (a.type === b.type || a.accommodation.id !== b.accommodation.id) continue;
+        const cheaper = Math.min(a.totalCost, b.totalCost);
+        const gap = Math.abs(a.totalCost - b.totalCost) / cheaper;
+        expect(
+          gap,
+          `${a.type} (${a.totalCost}€) y ${b.type} (${b.totalCost}€) son el mismo hotel casi al mismo precio`,
+        ).toBeGreaterThanOrEqual(0.05);
+      }
+    }
+  });
+
+  // La contraparte: colapsar no puede llevarse por delante una alternativa
+  // real. Con el mismo hotel pero 174 € de diferencia —lo que cuesta pasar
+  // de un vuelo con escala a uno directo— siguen siendo dos opciones.
+  it("no colapsa dos propuestas que sí ofrecen algo distinto", async () => {
+    const proposals = (await generar(PETICION)).payload.proposals as TripProposal[];
+
+    expect(proposals.length).toBe(3);
+  });
+
+  // Y si se enseñan menos cajas, hay que decir por qué y qué haría falta:
+  // "no hay más opciones" a secas es peor que las tres cajas repetidas.
+  it("cuando no hay alternativas reales, dice cuánto haría falta para abrirlas", async () => {
+    const { payload } = await generar(PRESUPUESTO_JUSTO);
+    const proposals = payload.proposals as TripProposal[];
+    const metadata = payload.metadata as {
+      budgetUnlock: { extraBudget: number; unlockedOptions: number; currentOptions: number } | null;
+    };
+
+    const hoteles = new Set(proposals.map((p) => p.accommodation.id)).size;
+    if (hoteles > 1 && proposals.length >= 3) return; // hay variedad: nada que sugerir
+
+    expect(metadata.budgetUnlock, "menos opciones y ninguna explicación de por qué").not.toBeNull();
+    expect(metadata.budgetUnlock!.extraBudget).toBeGreaterThan(0);
+    expect(metadata.budgetUnlock!.unlockedOptions).toBeGreaterThan(metadata.budgetUnlock!.currentOptions);
+  });
+
+  // Con presupuesto holgado no hay nada que sugerir, y sugerirlo igualmente
+  // sería empujar a gastar de más sin motivo.
+  it("no sugiere subir el presupuesto cuando ya hay variedad", async () => {
+    const { payload } = await generar({ ...PETICION, budget: 6000 });
+    const metadata = payload.metadata as { budgetUnlock: unknown };
+    const proposals = payload.proposals as TripProposal[];
+
+    if (new Set(proposals.map((p) => p.accommodation.id)).size > 1 && proposals.length >= 3) {
+      expect(metadata.budgetUnlock).toBeNull();
+    }
   });
 
   it("es determinista: la misma petición da el mismo resultado", async () => {

@@ -5,6 +5,7 @@ import { Tabs } from "./Tabs";
 import type { TabItem } from "./Tabs";
 import { DayCard } from "./DayCard";
 import { DayMapLazy } from "./DayMapLazy";
+import { DayRoute } from "./DayRoute";
 
 interface DayByDayViewProps {
   itinerary: Itinerary;
@@ -52,7 +53,10 @@ export function DayByDayView({ itinerary, searchParams, tier, editable, onUpdate
           editable={editable}
           onUpdateDay={onUpdateDay}
         />
-        <DayMapLazy stops={selectedDay.stops} tier={tier} />
+        <div className="flex flex-col gap-4">
+          <DayMapLazy stops={selectedDay.stops} tier={tier} />
+          <DayRoute stops={selectedDay.stops} tier={tier} />
+        </div>
       </div>
     </div>
   );

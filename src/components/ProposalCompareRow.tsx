@@ -1,5 +1,6 @@
 import type { TripProposal } from "../types";
 import { TIER_THEME } from "../constants/tierTheme";
+import { DataBadge } from "./DataBadge";
 import { Icon } from "./Icon";
 
 interface ProposalCompareRowProps {
@@ -36,9 +37,11 @@ export function ProposalCompareRow({ proposal, onViewDetail }: ProposalCompareRo
           {theme.label}
         </span>
         <p className="mt-1 font-semibold text-ink-900">{hotel.name}</p>
-        <p className="text-xs text-ink-500">
-          {"★".repeat(hotel.stars)} · {hotel.rating.toFixed(1)}/5
-        </p>
+        {/* Antes: {"★".repeat(hotel.stars)} · {rating}/5 — las estrellas se
+            derivaban de la propia valoración, así que era el mismo número dos
+            veces y el primero fingiendo ser una categoría hotelera. */}
+        <p className="mt-0.5 text-xs text-ink-500">Valoración {hotel.rating.toFixed(1)}/5</p>
+        <DataBadge confidence="simulado" className="mt-1.5" linkToSources />
       </div>
 
       <div className="flex-1">

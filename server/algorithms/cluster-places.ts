@@ -30,7 +30,10 @@ export function calculateTravelMatrix(places: ClusterablePlace[]): TravelMatrixE
       const speedKmh = transportMode === "walk" ? WALK_SPEED_KMH : TRANSIT_SPEED_KMH;
       const travelMinutes = Math.max(MIN_TRAVEL_MINUTES, Math.round((distanceKm / speedKmh) * 60));
 
-      entries.push({ fromId: from.id, toId: to.id, distanceKm, travelMinutes, transportMode });
+      // Todo lo que sale de aquí es una estimación sobre la línea recta: no
+      // se ha consultado ninguna calle. resolveTravelMatrix() sustituye por
+      // rutas reales los pares que consigue resolver.
+      entries.push({ fromId: from.id, toId: to.id, distanceKm, travelMinutes, transportMode, estimated: true });
     }
   }
 

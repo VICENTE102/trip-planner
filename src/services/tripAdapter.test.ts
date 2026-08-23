@@ -168,6 +168,138 @@ function response(proposals: BackendTripProposal[], disclaimer?: string): Genera
   };
 }
 
+// --- Lo que llegaba por la red y el adaptador tiraba -----------------------
+
+type BackendItem = BackendTripProposal["itinerary"][number]["items"][number];
+
+function visita(overrides: Partial<BackendItem> = {}): BackendItem {
+  return {
+    id: `v-${Math.random()}`,
+    startTime: "2026-10-05T10:00:00.000Z",
+    endTime: "2026-10-05T11:30:00.000Z",
+    type: "visit",
+    title: "Museo Nazionale Etrusco",
+    preference: "culture",
+    latitude: 41.918,
+    longitude: 12.476,
+    durationMinutes: 90,
+    verificationStatus: "partial",
+    ...overrides,
+  };
+}
+
+function conItinerario(items: BackendItem[]): BackendTripProposal {
+  return {
+    ...backendProposal("economical", ECONOMICA),
+    itinerary: [{ dayNumber: 1, date: "2026-10-05", items }],
+  };
+}
+
+const primerDia = (proposal: BackendTripProposal) =>
+  toSearchResult(response([proposal]), SEARCH).proposals[0].itinerary.days[0];
+
+describe("toSearchResult · procedencia de los datos", () => {
+  // El backend distingue "partial" (Overture: el sitio existe) de
+  // "unverified" (mock: no existe) y el adaptador no miraba el campo, así
+  // que un museo real y un sitio inventado se pintaban idénticos.
+  it("marca como reales los sitios que vienen de un proveedor real", () => {
+    const dia = primerDia(conItinerario([visita({ verificationStatus: "partial" })]));
+
+    expect(dia.stops[0].verification).toBe("real");
+    expect(dia.placesVerification).toBe("real");
+  });
+
+  it("marca como simulados los sitios inventados", () => {
+    const dia = primerDia(conItinerario([visita({ verificationStatus: "unverified" })]));
+
+    expect(dia.stops[0].verification).toBe("simulado");
+    expect(dia.placesVerification).toBe("simulado");
+  });
+
+  // Basta una visita inventada para que "lugares reales" deje de ser cierto:
+  // una etiqueta que miente a veces no sirve de nada.
+  it("un solo sitio inventado tumba la etiqueta de día real", () => {
+    const dia = primerDia(
+      conItinerario([
+        visita({ verificationStatus: "partial" }),
+        visita({ verificationStatus: "unverified", startTime: "2026-10-05T16:00:00.000Z" }),
+      ]),
+    );
+
+    expect(dia.placesVerification).toBe("simulado");
+  });
+
+  // El caso que costó un paso entero: OpenRouteService mide los paseos sobre
+  // el callejero real y ni un minuto llegaba a la pantalla.
+  it("lleva los minutos de desplazamiento y si son medidos o estimados", () => {
+    const dia = primerDia(
+      conItinerario([
+        visita(),
+        visita({
+          startTime: "2026-10-05T16:00:00.000Z",
+          travelMinutesFromPrevious: 49,
+          transportMode: "walk",
+          travelEstimated: false,
+        }),
+      ]),
+    );
+
+    expect(dia.stops[1].travelMinutes).toBe(49);
+    expect(dia.stops[1].transportMode).toBe("walk");
+    expect(dia.stops[1].travelEstimated).toBe(false);
+  });
+
+  // Entre el Coliseo y San Pedro la línea recta decía 10 minutos y la calle
+  // real dice 49. Sin esta marca las dos cifras se pintan igual.
+  it("distingue un tiempo estimado de uno medido", () => {
+    const dia = primerDia(
+      conItinerario([
+        visita(),
+        visita({ startTime: "2026-10-05T16:00:00.000Z", travelMinutesFromPrevious: 10, travelEstimated: true }),
+      ]),
+    );
+
+    expect(dia.stops[1].travelEstimated).toBe(true);
+  });
+
+  // Overture guarda la web oficial de cada sitio y se quedaba en el campo
+  // bookingUrl sin que nadie la enseñara. Es donde se comprueban la tarifa y
+  // el horario, que nosotros solo estimamos.
+  it("lleva la web oficial del sitio cuando el proveedor la tiene", () => {
+    const dia = primerDia(conItinerario([visita({ bookingUrl: "https://museoetru.it" })]));
+
+    expect(dia.stops[0].website).toBe("https://museoetru.it");
+  });
+});
+
+describe("toTripProposal · ficha de alojamiento", () => {
+  // Se derivaban estrellas de la propia valoración (3,8/5 -> ★★★) y se
+  // pintaban al lado de ella: el mismo número dos veces, y el primero
+  // disfrazado de una categoría hotelera que el backend no tiene.
+  it("ya no inventa una categoría de estrellas a partir de la valoración", () => {
+    const { hotel } = toSearchResult(response([backendProposal("economical", ECONOMICA)]), SEARCH).proposals[0];
+
+    expect(hotel).not.toHaveProperty("stars");
+    expect(hotel.rating).toBe(4);
+  });
+
+  // Tres datos que el motor ya calculaba y la ficha no enseñaba. La
+  // cancelación gratuita solo aparecía cuando FALTABA, en los avisos.
+  it("lleva la distancia al centro, la cancelación y el desayuno", () => {
+    const base = backendProposal("economical", ECONOMICA);
+    const proposal = {
+      ...base,
+      accommodation: { ...base.accommodation, distanceToCenterKm: 1.9, freeCancellation: true, breakfastIncluded: false },
+    };
+
+    const { hotel } = toSearchResult(response([proposal]), SEARCH).proposals[0];
+
+    expect(hotel.distanceToCenterKm).toBe(1.9);
+    expect(hotel.freeCancellation).toBe(true);
+    expect(hotel.breakfastIncluded).toBe(false);
+  });
+});
+
 describe("toSearchResult · razones y avisos", () => {
   it("ya no tira las razones ni los avisos del motor", () => {
     const result = toSearchResult(

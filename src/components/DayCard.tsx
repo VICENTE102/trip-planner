@@ -12,6 +12,7 @@ import {
   setRestaurantEdit,
 } from "../utils/itineraryEdits";
 import type { DayTextField } from "../utils/itineraryEdits";
+import { DataBadge } from "./DataBadge";
 import { Icon } from "./Icon";
 import type { IconName } from "./Icon";
 import { ExternalLinkButton } from "./ExternalLinkButton";
@@ -339,10 +340,16 @@ export function DayCard({
             </span>
             <span className="text-sm text-ink-500">{formatDate(day.date)}</span>
           </div>
-          <span className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold ${theme.badge}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${theme.solidBg}`} />
-            {getDayTypeLabel(day)}
-          </span>
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {/* Solo cuando TODAS las visitas del día son sitios reales de
+                Overture. Basta una inventada para que la etiqueta deje de ser
+                cierta, y una etiqueta que miente a veces no sirve de nada. */}
+            {day.placesVerification === "real" && <DataBadge confidence="real" label="Lugares reales" linkToSources />}
+            <span className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold ${theme.badge}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${theme.solidBg}`} />
+              {getDayTypeLabel(day)}
+            </span>
+          </div>
         </div>
 
         <div className="relative mt-4 flex flex-col gap-4">

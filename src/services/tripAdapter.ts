@@ -1,4 +1,5 @@
 import type {
+  DataConfidence,
   DayMeal,
   DayStop,
   EconomicSummary,
@@ -28,13 +29,19 @@ import { nightsBetween } from "../utils/dates";
 // motor real sin rediseñar todas las vistas de golpe.
 //
 // Lo que el motor calcula y aquí todavía se pierde, por no tener dónde
-// pintarlo: horas de inicio/fin, duraciones, desplazamientos entre sitios,
-// pausas, coste por actividad, enlaces de reserva por actividad, y los
-// campos score/rank/scoreBreakdown de cada propuesta.
+// pintarlo: horas de inicio/fin, duraciones, pausas, coste por actividad, y
+// los campos score/rank/scoreBreakdown de cada propuesta.
 //
 // `reasons` y `warnings` sí llegan desde el Paso "sacar las razones a la
 // comparativa": son frases ya redactadas por el motor y eran lo más
 // desaprovechado de la respuesta.
+//
+// Y desde "enseñar lo real": `verificationStatus`, `bookingUrl` (que para un
+// sitio de Overture es su web oficial) y `travelMinutesFromPrevious` con su
+// `travelEstimated`. Los tres llegaban por la red y se tiraban aquí. El
+// último era el más caro de todos: integramos OpenRouteService en el Paso 5
+// para medir los paseos sobre el callejero real y no se veía un solo minuto
+// en pantalla, solo influía en silencio en la hora de cada visita.
 
 const TYPE_TO_TIER: Record<BackendTripProposal["type"], TierLevel> = {
   economical: "barato",
@@ -110,9 +117,30 @@ function joinTitles(items: ItineraryItem[]): string {
   return items.map((item) => item.title).join(" · ");
 }
 
+// El backend ya distingue de dónde sale cada sitio y nadie lo miraba:
+//
+//   partial     Overture Maps: el sitio existe y está donde dice; su precio
+//               y su duración siguen siendo estimaciones
+//   verified    reservado para cuando haya un proveedor que confirme también
+//               tarifas y horarios; hoy no lo pone nadie
+//   unverified  generado por los mocks: no existe
+//
+// "partial" se traduce a "real" y no a "estimado" porque lo que la etiqueta
+// promete es el sitio, no la tarifa. La letra pequeña está en /fuentes.
+function confidenceOf(item: ItineraryItem): DataConfidence {
+  return item.verificationStatus === "unverified" ? "simulado" : "real";
+}
+
+// Un día es de sitios reales solo si TODAS sus visitas lo son: basta una
+// inventada para que la etiqueta deje de ser cierta, y una etiqueta que
+// miente a veces no sirve de nada.
+function dayConfidence(visits: ItineraryItem[]): DataConfidence | undefined {
+  if (visits.length === 0) return undefined;
+  return visits.every((visit) => confidenceOf(visit) === "real") ? "real" : "simulado";
+}
+
 function toHotel(proposal: BackendTripProposal, nights: number): Hotel {
   const { accommodation } = proposal;
-  const rating = accommodation.rating ?? 0;
 
   return {
     id: accommodation.id,
@@ -122,12 +150,16 @@ function toHotel(proposal: BackendTripProposal, nights: number): Hotel {
     // división, no un dato propio.
     pricePerNight: nights > 0 ? Math.round(accommodation.totalPrice / nights) : accommodation.totalPrice,
     totalPrice: Math.round(accommodation.totalPrice),
-    rating,
-    // El backend no tiene categoría de estrellas: se deriva de la
-    // valoración (4,5/5 -> 4 estrellas), acotada a 1-5 para que la ficha
-    // nunca pinte cero estrellas ni desborde.
-    stars: Math.min(5, Math.max(1, Math.floor(rating))),
+    rating: accommodation.rating ?? 0,
+    // Aquí se derivaban unas estrellas de la valoración
+    // (`Math.floor(rating)`, 3,8/5 -> ★★★) y se pintaban al lado de la propia
+    // valoración. No eran dos datos: era el mismo número dos veces, y el
+    // primero disfrazado de categoría hotelera, que el backend no tiene.
+    // Se enseña solo la valoración, que es lo que de verdad hay.
     amenities: accommodation.amenities,
+    distanceToCenterKm: accommodation.distanceToCenterKm,
+    freeCancellation: accommodation.freeCancellation,
+    breakfastIncluded: accommodation.breakfastIncluded,
   };
 }
 
@@ -195,6 +227,11 @@ function toDay(backendDay: BackendItineraryDay, isArrivalDay: boolean): Itinerar
       text: visit.title,
       lat: visit.latitude!,
       lng: visit.longitude!,
+      verification: confidenceOf(visit),
+      website: visit.bookingUrl,
+      travelMinutes: visit.travelMinutesFromPrevious,
+      transportMode: visit.transportMode === "transit" ? "transit" : visit.transportMode === "walk" ? "walk" : undefined,
+      travelEstimated: visit.travelEstimated,
     }));
 
   return {
@@ -215,6 +252,7 @@ function toDay(backendDay: BackendItineraryDay, isArrivalDay: boolean): Itinerar
     afternoonActivityId: activityIdOf(afternoonVisits),
     night: nightVisits.length > 0 ? joinTitles(nightVisits) : "Noche sin actividades programadas.",
     stops,
+    placesVerification: dayConfidence(visits),
   };
 }
 
@@ -297,5 +335,10 @@ export function toSearchResult(
     .map((proposal) => toTripProposal(proposal, searchParams, allProposalReasons))
     .sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier]);
 
-  return { searchParams, proposals, disclaimer: response.metadata.disclaimer };
+  return {
+    searchParams,
+    proposals,
+    disclaimer: response.metadata.disclaimer,
+    budgetUnlock: response.metadata.budgetUnlock ?? null,
+  };
 }

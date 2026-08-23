@@ -50,7 +50,7 @@ export function ResultsScreen() {
     return <Navigate to="/" replace />;
   }
 
-  const { searchParams, proposals, disclaimer } = searchResult;
+  const { searchParams, proposals, disclaimer, budgetUnlock } = searchResult;
   const hasProposals = proposals.length > 0;
   const cheapestTotal = hasProposals ? Math.min(...proposals.map((p) => p.economicSummary.total)) : null;
   const activeProposal = proposals.find((p) => p.tier === activeTab);
@@ -135,9 +135,25 @@ export function ResultsScreen() {
                   No se ha encontrado ninguna combinación de vuelo y alojamiento para estas fechas.
                 </p>
               )}
-              <p className="mt-2 text-sm text-ink-500">
-                Prueba a subir el presupuesto, acortar el viaje o cambiar las fechas.
-              </p>
+              {/* Con cero propuestas es cuando más ayuda una cifra concreta:
+                  ya se dice cuánto cuesta lo más barato, y esto añade cuántas
+                  opciones se abren, que es lo que responde "¿y si subo un
+                  poco?". */}
+              {budgetUnlock && budgetUnlock.unlockedOptions > 0 ? (
+                <p className="mt-2 text-sm text-ink-700">
+                  Con <span className="font-bold text-ink-900">{budgetUnlock.extraBudget}€ más</span> podrías elegir
+                  entre{" "}
+                  <span className="font-bold text-ink-900">
+                    {budgetUnlock.unlockedOptions} alojamiento
+                    {budgetUnlock.unlockedOptions > 1 ? "s" : ""}
+                  </span>
+                  .
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-ink-500">
+                  Prueba a subir el presupuesto, acortar el viaje o cambiar las fechas.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => navigate("/")}
@@ -160,6 +176,40 @@ export function ResultsScreen() {
               <div key={activeTab} className="animate-slide-in-trail pb-8">
                 {activeTab === "comparativa" ? (
                   <div className="flex flex-col gap-3">
+                    {/* Cuando el presupuesto solo da para un alojamiento, el
+                        motor devuelve menos propuestas en vez de repetir el
+                        mismo viaje con tres etiquetas. Entonces hay que decir
+                        por qué y qué haría falta: "no hay más opciones" a
+                        secas sería peor que las tres cajas repetidas. */}
+                    {budgetUnlock && (
+                      <div className="rounded-2xl border border-sunset-200 bg-sunset-50/60 p-4">
+                        <p className="flex items-start gap-2 text-sm font-semibold text-ink-900">
+                          <Icon name="compass" size={16} className="mt-0.5 flex-none text-sunset-600" />
+                          <span>
+                            {budgetUnlock.currentOptions <= 1
+                              ? "Con este presupuesto solo hay un alojamiento disponible"
+                              : `Con este presupuesto hay ${budgetUnlock.currentOptions} alojamientos disponibles`}
+                          </span>
+                        </p>
+                        <p className="mt-1.5 pl-6 text-sm text-ink-700">
+                          Con{" "}
+                          <span className="font-bold text-ink-900">{budgetUnlock.extraBudget}€ más</span> (
+                          {searchParams.budget + budgetUnlock.extraBudget}€ en total) podrías elegir entre{" "}
+                          <span className="font-bold text-ink-900">
+                            {budgetUnlock.unlockedOptions} alojamientos
+                          </span>
+                          .
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => navigate("/")}
+                          className="mt-3 ml-6 rounded-full bg-ink-900 px-4 py-2 text-xs font-bold text-white transition hover:opacity-90"
+                        >
+                          Cambiar la búsqueda
+                        </button>
+                      </div>
+                    )}
+
                     {disclaimer && (
                       <p className="flex items-start gap-1.5 px-1 text-xs text-ink-500">
                         <Icon name="alert" size={13} className="mt-0.5 flex-none text-ink-400" />

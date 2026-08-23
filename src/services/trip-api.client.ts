@@ -119,6 +119,8 @@ export interface ItineraryItem {
   durationMinutes: number;
   travelMinutesFromPrevious?: number;
   transportMode?: string;
+  /** Si esos minutos son una ruta medida por OpenRouteService o una estimación. */
+  travelEstimated?: boolean;
   costPerPerson?: number;
   bookingRequired?: boolean;
   bookingUrl?: string;
@@ -161,6 +163,14 @@ export interface GenerateTripResponse {
     cheapestTotalCost: number | null;
     /** Aviso global del producto, común a todas las propuestas. */
     disclaimer?: string;
+    // Cuánto haría falta para que haya alternativas reales. Lo calcula el
+    // motor porque el coste de un viaje depende del presupuesto: subirlo
+    // 300 € sube también unos 84 € el coste de cada combinación.
+    budgetUnlock?: {
+      extraBudget: number;
+      unlockedOptions: number;
+      currentOptions: number;
+    } | null;
   };
   proposals: TripProposal[];
 }

@@ -56,6 +56,39 @@ describe("resolveTravelMatrix", () => {
     expect(ida.distanceKm).toBe(2.4);
   });
 
+  // Sin esta distinción la interfaz pinta igual "30 min medidos sobre el
+  // callejero" y "30 min de dividir una línea recta entre 4,5 km/h", que es
+  // justo lo que el Paso 5 vino a arreglar. Los tres casos que puede haber:
+  it("distingue el paseo medido por ORS de una estimación", async () => {
+    stubOrs([[0, 1800], [1500, 0]], [[0, 2.4], [2.4, 0]], []);
+
+    const { resolveTravelMatrix } = await loadService();
+    const ida = entrada(await resolveTravelMatrix([HOTEL, MUSEO]), "hotel", "museo")!;
+
+    expect(ida.estimated, "un paseo real de ORS no es una estimación").toBe(false);
+  });
+
+  // El transporte parte de la distancia real, pero el tiempo es una
+  // suposición nuestra: ORS no da transporte público.
+  it("marca el transporte como estimación aunque parta de la distancia real", async () => {
+    stubOrs([[0, 7200], [7200, 0]], [[0, 22], [22, 0]], []);
+
+    const { resolveTravelMatrix } = await loadService();
+    const ida = entrada(await resolveTravelMatrix([HOTEL, LEJOS]), "hotel", "lejos")!;
+
+    expect(ida.transportMode).toBe("transit");
+    expect(ida.estimated).toBe(true);
+  });
+
+  it("marca como estimación lo que se calcula en línea recta", async () => {
+    vi.stubEnv("ORS_API_KEY", "");
+
+    const { resolveTravelMatrix } = await loadService();
+    const ida = entrada(await resolveTravelMatrix([HOTEL, MUSEO]), "hotel", "museo")!;
+
+    expect(ida.estimated).toBe(true);
+  });
+
   it("respeta el sentido: ida y vuelta pueden durar distinto", async () => {
     stubOrs([[0, 1800], [1500, 0]], [[0, 2.4], [2.4, 0]], []);
 

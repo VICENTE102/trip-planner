@@ -127,8 +127,14 @@ function buildReasons(
 // Descargo que vale para TODAS las propuestas por igual, no para ninguna en
 // concreto. Viaja en metadata de la respuesta, no dentro de cada propuesta:
 // repetido tres veces en una comparativa es ruido, y además no compara nada.
+//
+// Ya NO acusa a las actividades de simuladas. No lo son: los sitios vienen de
+// Overture Maps con su nombre y sus coordenadas reales, y son lo más sólido
+// que tiene la app. Lo inventado son los vuelos y el alojamiento, y decirlo
+// de todo por igual escondía justamente lo bueno. Cada dato lleva ahora su
+// propia marca en la interfaz; esto es solo el resumen.
 export const SIMULATED_DATA_DISCLAIMER =
-  "Datos simulados: vuelos, alojamiento y actividades son estimaciones generadas automáticamente, pendientes de verificación con proveedores reales.";
+  "Los vuelos y el alojamiento son simulados: sirven para orientar el presupuesto, no para reservar. Los lugares del itinerario son reales.";
 
 // Solo lo que avisa de ESTA propuesta y no de las otras dos.
 function buildWarnings(combination: TripCombination): string[] {
@@ -193,6 +199,44 @@ function bestPreferringNewHotel(
 ): ScoredCombination | undefined {
   const fresh = candidates.filter((scored) => !usedHotelIds.has(scored.combination.accommodation.id));
   return [...(fresh.length > 0 ? fresh : candidates)].sort(compare)[0];
+}
+
+// Por debajo de esta diferencia de precio, y con el mismo alojamiento, dos
+// propuestas no son dos opciones: son la misma con otra etiqueta.
+const MEANINGFUL_PRICE_STEP = 0.05;
+
+// Quita las propuestas que no aportan una alternativa real.
+//
+// Con presupuestos justos pasa esto: solo un hotel entra, y las tres
+// propuestas salen con él cambiando únicamente el vuelo. En una búsqueda de
+// Roma a 7 noches, "Equilibrado 1.703 €" y "Cómodo 1.723 €" eran el mismo
+// hotel, el mismo tipo de vuelo y veinte euros de diferencia: dos cajas para
+// decir una sola cosa.
+//
+// Etiquetar eso como un escalón de categoría es prometer algo que no está.
+// Se conserva la más barata de cada par indistinguible, que a igualdad de
+// viaje es siempre la mejor para quien lo paga. Las propuestas llegan aquí
+// ya ordenadas de menos a más precio.
+function dropIndistinguishable(
+  candidates: { type: ProposalType; scored: ScoredCombination }[],
+): { type: ProposalType; scored: ScoredCombination }[] {
+  const kept: typeof candidates = [];
+
+  for (const candidate of candidates) {
+    const duplicate = kept.some(({ scored }) => {
+      if (scored.combination.accommodation.id !== candidate.scored.combination.accommodation.id) {
+        return false;
+      }
+      const cheaper = Math.min(cost(scored), cost(candidate.scored));
+      return Math.abs(cost(candidate.scored) - cost(scored)) / cheaper < MEANINGFUL_PRICE_STEP;
+    });
+
+    if (!duplicate) {
+      kept.push(candidate);
+    }
+  }
+
+  return kept;
 }
 
 // Sección 21 (Fase 8), pasos 7-8: elige económica / equilibrada / cómoda
@@ -277,11 +321,11 @@ export async function selectDiverseProposals(
     (a, b) => weightedScore(b.scoreBreakdown, BALANCED_WEIGHTS) - weightedScore(a.scoreBreakdown, BALANCED_WEIGHTS),
   );
 
-  const chosen: { type: ProposalType; scored: ScoredCombination }[] = [
+  const chosen = dropIndistinguishable([
     { type: "economical", scored: economical },
     ...(recommended ? [{ type: "recommended" as const, scored: recommended }] : []),
     ...(comfort ? [{ type: "comfort" as const, scored: comfort }] : []),
-  ];
+  ]);
 
   const proposals: TripProposal[] = [];
   for (const { type, scored } of chosen) {
