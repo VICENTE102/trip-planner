@@ -10,10 +10,14 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    // Se incluye src/services porque la capa de consentimiento y analítica
-    // tiene lógica de verdad que hay que blindar (sobre todo: que no se mida
-    // nada antes de aceptar). Sigue sin haber pruebas de componentes React.
-    include: ["{api,server}/**/*.test.ts", "src/services/**/*.test.ts"],
+    // Se incluyen src/services y src/utils porque ahí hay lógica de verdad
+    // que blindar: que no se mida nada antes de aceptar las cookies, que el
+    // adaptador no tire lo que manda el motor, y cuándo se puede dibujar
+    // sobre el mapa —esta última se añadió después de que un fallo de quince
+    // líneas dejara todos los itinerarios sin marcadores.
+    //
+    // Sigue sin haber pruebas de componentes React, a propósito.
+    include: ["{api,server}/**/*.test.ts", "src/{services,utils}/**/*.test.ts"],
     // Las de integración salen a la red y necesitan GEOAPIFY_API_KEY: se
     // ejecutan a mano con `npm run test:integration`, nunca en CI. Un fallo
     // de un servicio ajeno no debe poner el repositorio en rojo.

@@ -1,5 +1,6 @@
 import { Suspense, lazy } from "react";
 import type { DayStop, TierLevel } from "../types";
+import { MAP_BOX_CLASSES } from "./mapBox";
 
 // MapLibre es la dependencia más pesada del frontend después del generador
 // de PDF. Cargarla con import() la saca del bundle principal, para que quien
@@ -8,7 +9,7 @@ import type { DayStop, TierLevel } from "../types";
 const DayMap = lazy(() => import("./DayMap").then((module) => ({ default: module.DayMap })));
 
 const placeholder = (
-  <div className="flex h-[420px] items-center justify-center rounded-2xl border border-ink-200 bg-ink-50 lg:h-full">
+  <div className={`flex items-center justify-center bg-ink-50 ${MAP_BOX_CLASSES}`}>
     <p className="text-sm text-ink-500">Cargando el mapa…</p>
   </div>
 );

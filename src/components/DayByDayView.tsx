@@ -53,7 +53,12 @@ export function DayByDayView({ itinerary, searchParams, tier, editable, onUpdate
           editable={editable}
           onUpdateDay={onUpdateDay}
         />
-        <div className="flex flex-col gap-4">
+        {/* `lg:h-full` es lo que devuelve al mapa una altura de referencia:
+            sin él, el `flex-1` de MAP_BOX_CLASSES se mide contra una columna
+            sin altura propia y el mapa encoge hasta lo que ocupe el
+            recorrido. `min-h-0` deja que la columna quepa en la fila en vez
+            de estirarla. */}
+        <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
           <DayMapLazy stops={selectedDay.stops} tier={tier} />
           <DayRoute stops={selectedDay.stops} tier={tier} />
         </div>

@@ -13,6 +13,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Feature, LineString } from "geojson";
 import type { DayStop, TierLevel } from "../types";
 import { MAP_STYLE_URL } from "../constants/mapStyle";
+import { onStyleReady } from "../utils/mapStyleReady";
+import { MAP_BOX_CLASSES } from "./mapBox";
 
 interface DayMapProps {
   stops: DayStop[];
@@ -112,20 +114,52 @@ export function DayMap({ stops, tier }: DayMapProps) {
   // marcadores sobre el mapa que ya existe, y se reencuadra con una
   // animación en vez de saltar.
   //
-  // El estado del estilo se consulta con isStyleLoaded() en vez de guardar un
-  // `ready` que ponía un listener de "load". Con el doble montaje que hace
-  // React en desarrollo (StrictMode) ese listener se quedaba colgando de la
-  // primera instancia, que se destruye enseguida: el `ready` no llegaba nunca
-  // a true y el mapa se quedaba en la vista mundial, sin marcadores ni ruta.
-  // Preguntar el estado en vez de escucharlo también cubre el caso contrario,
-  // que el estilo ya estuviera cargado antes de que corriera este efecto.
+  // Lo que depende del estilo del mapa se reduce aquí al mínimo, y la espera
+  // la resuelve onStyleReady() (utils/mapStyleReady.ts), que tiene sus
+  // propias pruebas. Antes se esperaba con `map.once("load")`: un evento que
+  // ocurre una sola vez en la vida del mapa, cuando `isStyleLoaded()` vuelve
+  // a false constantemente. Caer en ese hueco dejaba el mapa mudo para
+  // siempre.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !hasStops) return;
 
     const coordinates = stops.map((stop) => [stop.lng, stop.lat] as [number, number]);
 
-    function draw() {
+    // Las paradas y el encuadre van SIN esperar a nada.
+    //
+    // Antes todo esto colgaba de que el estilo estuviera cargado, y ahí es
+    // donde se rompía: con el proveedor de teselas a medio responder, el mapa
+    // nunca se daba por cargado y el día se quedaba sin un solo marcador,
+    // encuadrado en el Atlántico. La pestaña entera quedaba inservible por un
+    // problema del mapa de fondo.
+    //
+    // Y no hacía ninguna falta esperar: un Marker es un div que MapLibre
+    // coloca sobre el lienzo, y fitBounds es un movimiento de cámara. Ni uno
+    // ni otro tocan el estilo. Lo único que sí lo necesita es la capa de la
+    // línea, y esa se añade aparte, más abajo. Si el fondo tarda o falla, se
+    // pierde la línea de puntos: nunca las paradas.
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = stops.map((stop, index) =>
+      new Marker({ element: buildMarkerElement(index, color), anchor: "bottom" })
+        .setLngLat([stop.lng, stop.lat])
+        .setPopup(new Popup({ offset: 32 }).setDOMContent(buildPopupContent(stop)))
+        .addTo(map),
+    );
+
+    if (coordinates.length === 1) {
+      map.easeTo({ center: coordinates[0], zoom: SINGLE_STOP_ZOOM });
+    } else {
+      const bounds = coordinates.reduce(
+        (acc, coordinate) => acc.extend(coordinate),
+        new LngLatBounds(coordinates[0], coordinates[0]),
+      );
+      map.fitBounds(bounds, { padding: 48, maxZoom: 16 });
+    }
+
+    // La línea que une las paradas sí es una capa del estilo, y addSource()
+    // lanza si el estilo no ha terminado. Se espera solo para esto.
+    function drawRouteLine() {
       const line: Feature<LineString> = {
         type: "Feature",
         properties: {},
@@ -146,46 +180,16 @@ export function DayMap({ stops, tier }: DayMapProps) {
           paint: { "line-color": color, "line-width": 3, "line-dasharray": [2, 2] },
         });
       }
-
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = stops.map((stop, index) =>
-        new Marker({ element: buildMarkerElement(index, color), anchor: "bottom" })
-          .setLngLat([stop.lng, stop.lat])
-          .setPopup(new Popup({ offset: 32 }).setDOMContent(buildPopupContent(stop)))
-          .addTo(map!),
-      );
-
-      if (coordinates.length === 1) {
-        map!.easeTo({ center: coordinates[0], zoom: SINGLE_STOP_ZOOM });
-        return;
-      }
-
-      const bounds = coordinates.reduce(
-        (acc, coordinate) => acc.extend(coordinate),
-        new LngLatBounds(coordinates[0], coordinates[0]),
-      );
-      map!.fitBounds(bounds, { padding: 48, maxZoom: 16 });
     }
 
-    let cancelled = false;
-    if (map.isStyleLoaded()) {
-      draw();
-    } else {
-      map.once("load", () => {
-        if (!cancelled) draw();
-      });
-    }
-
-    return () => {
-      cancelled = true;
-    };
+    return onStyleReady(map, drawRouteLine);
   }, [stops, color, hasStops]);
 
   // Un día puede quedarse sin ninguna parada con coordenadas (p. ej. el día
   // de llegada, ocupado por el vuelo y el registro en el hotel).
   if (!hasStops) {
     return (
-      <div className="flex h-[420px] items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-ink-50 p-6 text-center lg:h-full">
+      <div className={`flex items-center justify-center border-dashed bg-ink-50 p-6 text-center ${MAP_BOX_CLASSES}`}>
         <p className="text-sm text-ink-500">
           Este día no tiene visitas programadas, así que no hay ruta que dibujar en el mapa.
         </p>
@@ -195,7 +199,7 @@ export function DayMap({ stops, tier }: DayMapProps) {
 
   if (failed) {
     return (
-      <div className="flex h-[420px] items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-ink-50 p-6 text-center lg:h-full">
+      <div className={`flex items-center justify-center border-dashed bg-ink-50 p-6 text-center ${MAP_BOX_CLASSES}`}>
         <p className="text-sm text-ink-500">
           No se ha podido cargar el mapa en este navegador. Las paradas del día siguen listadas a la izquierda.
         </p>
@@ -203,5 +207,5 @@ export function DayMap({ stops, tier }: DayMapProps) {
     );
   }
 
-  return <div ref={containerRef} className="h-[420px] overflow-hidden rounded-2xl border border-ink-200 lg:h-full" />;
+  return <div ref={containerRef} className={`overflow-hidden ${MAP_BOX_CLASSES}`} />;
 }
