@@ -37,10 +37,10 @@ export function NavBar() {
               end={link.end}
               className={({ isActive }) =>
                 isOverlay
-                  ? `flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                  ? `flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
                       isActive ? "bg-white/20 text-white" : "text-white/80 hover:text-white"
                     }`
-                  : `flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                  : `flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
                       isActive ? "bg-sunset-100 text-sunset-600" : "text-ink-500 hover:text-ink-700"
                     }`
               }

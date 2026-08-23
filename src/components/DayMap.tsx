@@ -88,6 +88,15 @@ export function DayMap({ stops, tier }: DayMapProps) {
         // (el mapa ocupa media pantalla y el aviso completo se come una
         // esquina). El texto lo aporta el proveedor, ver constants/mapStyle.ts.
         attributionControl: false,
+        // Los controles de MapLibre vienen en inglés y toda la interfaz está
+        // en español. Solo se traduce lo que se ve o se lee con un lector de
+        // pantalla en esta pantalla; el resto del catálogo no se usa.
+        locale: {
+          "NavigationControl.ZoomIn": "Acercar",
+          "NavigationControl.ZoomOut": "Alejar",
+          "AttributionControl.ToggleAttribution": "Ver atribución del mapa",
+          "Map.Title": "Mapa del día",
+        },
       });
     } catch {
       // Sin WebGL (navegador antiguo, aceleración desactivada) el

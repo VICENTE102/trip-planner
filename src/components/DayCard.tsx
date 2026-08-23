@@ -344,7 +344,7 @@ export function DayCard({
             {/* Solo cuando TODAS las visitas del día son sitios reales de
                 Overture. Basta una inventada para que la etiqueta deje de ser
                 cierta, y una etiqueta que miente a veces no sirve de nada. */}
-            {day.placesVerification === "real" && <DataBadge confidence="real" label="Lugares reales" linkToSources />}
+            {day.placesVerification === "real" && <DataBadge confidence="real" label="Lugares reales" />}
             <span className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold ${theme.badge}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${theme.solidBg}`} />
               {getDayTypeLabel(day)}

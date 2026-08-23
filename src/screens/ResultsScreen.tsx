@@ -81,7 +81,11 @@ export function ResultsScreen() {
 
   return (
     <div>
-      <div className="relative h-[60vh] min-h-[420px] overflow-hidden">
+      {/* 40vh en móvil, 60 a partir de sm. En una pantalla de 844px el hero
+          pasa de 506 a 338: unos 170px que se convierten en la primera
+          propuesta entera, en vez de asomando por el borde inferior. En
+          escritorio no cambia nada. */}
+      <div className="relative h-[40vh] min-h-[280px] overflow-hidden sm:h-[60vh] sm:min-h-[420px]">
         <div className="absolute inset-0 bg-gradient-to-br from-ink-900 via-sunset-600 to-lagoon-600" />
         {heroImage && (
           <img
@@ -95,7 +99,7 @@ export function ResultsScreen() {
         {/* Smooth hand-off into the white content area below, instead of a hard cut */}
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent" />
 
-        <div className="absolute inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 pb-24 text-white lg:pb-28">
+        <div className="absolute inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 pb-16 text-white sm:pb-24 lg:pb-28">
           <h1 className="flex items-center gap-2 font-heading text-3xl font-bold lg:text-5xl">
             <Icon name="mapPin" size={26} />
             {searchParams.destination}
@@ -211,7 +215,7 @@ export function ResultsScreen() {
                     )}
 
                     {disclaimer && (
-                      <p className="flex items-start gap-1.5 px-1 text-xs text-ink-500">
+                      <p className="flex items-start gap-1.5 px-1 text-sm text-ink-500 sm:text-xs">
                         <Icon name="alert" size={13} className="mt-0.5 flex-none text-ink-400" />
                         <span>{disclaimer}</span>
                       </p>

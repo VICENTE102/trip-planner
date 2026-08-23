@@ -49,7 +49,11 @@ export function ExternalLinkButton({
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => track("clic_afiliado", { proveedor: providerOf(href), categoria: category, destino: destination })}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${VARIANT_CLASSES[variant]}`}
+      // min-h-[44px]: es el mínimo de zona pulsable que pide Apple, y este
+      // enlace medía 36. De todos los de la app es el que peor lleva un
+      // toque fallido: "Reservar actividad" y "Reservar hotel" son los que
+      // acabarán llevando los identificadores de afiliado del Paso 6.
+      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${VARIANT_CLASSES[variant]}`}
     >
       <Icon name={icon} size={16} />
       {label}

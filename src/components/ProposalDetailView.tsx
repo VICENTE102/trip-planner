@@ -160,7 +160,7 @@ export function ProposalDetailView({
           </ul>
 
           {warnings.length > 0 && (
-            <ul className="mt-1.5 flex flex-col gap-1 text-xs text-ink-500 sm:flex-row sm:flex-wrap sm:gap-x-5">
+            <ul className="mt-1.5 flex flex-col gap-1 text-sm text-ink-500 sm:flex-row sm:flex-wrap sm:gap-x-5 sm:text-xs">
               {warnings.map((warning) => (
                 <li key={warning} className="flex items-start gap-1.5">
                   <Icon name="alert" size={13} className="mt-0.5 flex-none text-sunset-500" />

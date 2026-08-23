@@ -40,7 +40,7 @@ export function HotelCard({ hotel, selected, onSelect, bookingUrl, destination }
             número dos veces, y disfrazado de categoría hotelera. La marca de
             simulado dice algo que el usuario no podía saber; las estrellas,
             no decían nada. */}
-        <DataBadge confidence="simulado" linkToSources />
+        <DataBadge confidence="simulado" />
       </div>
 
       <h3 className="mt-2 font-semibold text-ink-900">{hotel.name}</h3>
@@ -52,7 +52,7 @@ export function HotelCard({ hotel, selected, onSelect, bookingUrl, destination }
       {(hotel.distanceToCenterKm !== undefined ||
         hotel.freeCancellation !== undefined ||
         hotel.breakfastIncluded !== undefined) && (
-        <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm sm:text-xs">
           {hotel.distanceToCenterKm !== undefined && (
             <li className="flex items-center gap-1 text-ink-600">
               <Icon name="mapPin" size={12} className="flex-none text-ink-400" />

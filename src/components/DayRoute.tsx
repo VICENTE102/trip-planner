@@ -36,7 +36,7 @@ export function DayRoute({ stops, tier }: DayRouteProps) {
             {/* El desplazamiento va ENTRE dos paradas, así que se pinta antes
                 de la parada a la que lleva y nunca antes de la primera. */}
             {index > 0 && stop.travelMinutes !== undefined && stop.travelMinutes > 0 && (
-              <div className="flex items-center gap-2 py-1.5 pl-1 text-xs text-ink-500">
+              <div className="flex items-center gap-2 py-1.5 pl-1 text-sm text-ink-500 sm:text-xs">
                 <span className="ml-[3px] h-6 w-px flex-none bg-ink-200" />
                 <Icon
                   name={stop.transportMode === "transit" ? "compass" : "footprint"}
@@ -60,9 +60,9 @@ export function DayRoute({ stops, tier }: DayRouteProps) {
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-900">
                   <span className="font-medium">{stop.text}</span>
-                  {stop.verification && <DataBadge confidence={stop.verification} linkToSources />}
+                  {stop.verification && <DataBadge confidence={stop.verification} />}
                 </p>
-                <p className="text-xs text-ink-500">{stop.label}</p>
+                <p className="text-sm text-ink-500 sm:text-xs">{stop.label}</p>
                 {/* La web oficial del sitio, que Overture ya guarda para cada
                     lugar y no se enseñaba en ninguna parte. Es donde se
                     comprueban la tarifa y el horario, que nosotros solo
@@ -72,7 +72,11 @@ export function DayRoute({ stops, tier }: DayRouteProps) {
                     href={stop.website}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-lagoon-700 underline-offset-2 hover:underline"
+                    // 16px de alto era el objetivo más pequeño de toda la app, y encima
+                    // es el enlace que lleva a comprobar la tarifa real. El
+                    // pseudo-elemento le da los 44px de zona pulsable sin
+                    // convertirlo en un botón: sigue siendo un enlace de texto.
+                    className="relative mt-0.5 inline-flex items-center gap-1 text-sm font-semibold text-lagoon-700 underline-offset-2 before:absolute before:-inset-x-1 before:-inset-y-[13px] before:content-[''] hover:underline sm:text-xs"
                   >
                     Web oficial
                     <Icon name="externalLink" size={11} className="flex-none" />

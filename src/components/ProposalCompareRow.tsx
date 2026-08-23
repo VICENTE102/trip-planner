@@ -41,7 +41,7 @@ export function ProposalCompareRow({ proposal, onViewDetail }: ProposalCompareRo
             derivaban de la propia valoración, así que era el mismo número dos
             veces y el primero fingiendo ser una categoría hotelera. */}
         <p className="mt-0.5 text-xs text-ink-500">Valoración {hotel.rating.toFixed(1)}/5</p>
-        <DataBadge confidence="simulado" className="mt-1.5" linkToSources />
+        <DataBadge confidence="simulado" className="mt-1.5" />
       </div>
 
       <div className="flex-1">
@@ -55,7 +55,7 @@ export function ProposalCompareRow({ proposal, onViewDetail }: ProposalCompareRo
         </ul>
 
         {warnings.length > 0 && (
-          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-500">
+          <p className="mt-1.5 flex items-start gap-1.5 text-sm text-ink-500 sm:text-xs">
             <Icon name="alert" size={13} className="mt-0.5 flex-none text-sunset-500" />
             <span>{warnings[0]}</span>
           </p>

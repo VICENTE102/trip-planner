@@ -42,7 +42,7 @@ export function Tabs({ tabs, activeId, onChange }: TabsProps) {
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => onChange(tab.id)}
-                className={`relative flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition-all duration-200 ${
+                className={`relative flex min-h-[44px] items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition-all duration-200 ${
                   isActive
                     ? `${activeBg} -translate-y-0.5 text-white shadow-md`
                     : "border border-ink-200 bg-white text-ink-600 hover:-translate-y-0.5 hover:shadow-sm"

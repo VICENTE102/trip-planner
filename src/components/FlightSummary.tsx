@@ -39,7 +39,7 @@ export function FlightSummary({ itinerary, searchParams }: FlightSummaryProps) {
         {/* "(simulados)" entre paréntesis en el título se leía como un matiz.
             La marca dice lo mismo con el peso que le corresponde y, al
             enlazar a /fuentes, explica hasta dónde llega. */}
-        <DataBadge confidence="simulado" linkToSources />
+        <DataBadge confidence="simulado" />
       </p>
       <p className="mt-2 text-ink-700">
         <span className="font-semibold text-ink-900">Ida</span> · {outboundFlight.airline} ·{" "}

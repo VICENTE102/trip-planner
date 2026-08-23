@@ -7,8 +7,6 @@ interface DataBadgeProps {
   confidence: DataConfidence;
   /** Sustituye al texto por defecto ("Sitio real", "Estimado", "Simulado"). */
   label?: string;
-  /** Enlaza a la página de fuentes, donde está la explicación larga. */
-  linkToSources?: boolean;
   className?: string;
 }
 
@@ -41,34 +39,40 @@ const STYLES: Record<DataConfidence, { icon: IconName; text: string; classes: st
   },
 };
 
-const EXPLANATIONS: Record<DataConfidence, string> = {
-  real: "Nombre y ubicación reales, de Overture Maps. El precio y la duración son estimaciones.",
-  estimado: "Calculado por la app a partir de otros datos, no consultado a ningún proveedor.",
-  simulado: "Generado por la app para orientar el presupuesto. No corresponde a una oferta real.",
+// Qué significa cada marca, para quien llegue a /fuentes desde ella.
+const ANCHORS: Record<DataConfidence, string> = {
+  real: "#real",
+  estimado: "#estimado",
+  simulado: "#simulado",
 };
 
-export function DataBadge({ confidence, label, linkToSources, className = "" }: DataBadgeProps) {
+const DESCRIPTIONS: Record<DataConfidence, string> = {
+  real: "Sitio real: nombre y ubicación verificados. Ver fuentes de datos.",
+  estimado: "Dato estimado por la aplicación. Ver fuentes de datos.",
+  simulado: "Dato simulado, no es una oferta real. Ver fuentes de datos.",
+};
+
+export function DataBadge({ confidence, label, className = "" }: DataBadgeProps) {
   const style = STYLES[confidence];
-  const content = (
-    <>
+
+  // Esto era un `title`, y en un móvil un `title` no existe: no hay puntero
+  // que pueda posarse encima. La explicación que escribimos para ser honestos
+  // con el dato resultaba invisible justo para la mayoría de la gente. Ahora
+  // la marca es un enlace a /fuentes, donde esa explicación ya vivía escrita
+  // y con más espacio del que cabe en un globo.
+  //
+  // El pseudo-elemento agranda la zona pulsable de 21 a 45 px sin agrandar la
+  // marca: ocupa espacio de puntero, no de maquetación. Es la respuesta a que
+  // un objetivo de 21 px es imposible de acertar con el dedo, sin caer en
+  // inflar visualmente una etiqueta que debe ser discreta.
+  return (
+    <Link
+      to={`/fuentes${ANCHORS[confidence]}`}
+      aria-label={DESCRIPTIONS[confidence]}
+      className={`relative inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-semibold sm:text-[11px] ring-1 ring-inset transition before:absolute before:-inset-x-1 before:-inset-y-[13px] before:content-[''] hover:opacity-80 ${style.classes} ${className}`}
+    >
       <Icon name={style.icon} size={11} className="flex-none" />
       {label ?? style.text}
-    </>
-  );
-
-  const classes = `inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${style.classes} ${className}`;
-
-  if (linkToSources) {
-    return (
-      <Link to="/fuentes" title={EXPLANATIONS[confidence]} className={`${classes} transition hover:opacity-80`}>
-        {content}
-      </Link>
-    );
-  }
-
-  return (
-    <span title={EXPLANATIONS[confidence]} className={classes}>
-      {content}
-    </span>
+    </Link>
   );
 }
