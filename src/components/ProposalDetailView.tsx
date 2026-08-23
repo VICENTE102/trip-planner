@@ -90,10 +90,23 @@ export function ProposalDetailView({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
+      {/* En móvil esto eran dos filas y la segunda iba apretada: el precio
+          y los dos botones compartiendo ancho con `gap-4` y el padding de
+          escritorio. La cabecera se comía media pantalla antes de enseñar
+          nada del viaje.
+
+          Colapsar no es encoger el objetivo del dedo, que es la trampa
+          fácil: los botones llevan `min-h-[44px]`, el mínimo que pide Apple
+          y que antes no cumplían (medían 42 y 40). Lo que cambia es el
+          reparto, no el tamaño: el precio sube a la
+          altura del nombre del hotel —que es donde se lee de forma natural—
+          y los botones se quedan una fila entera para ellos en vez de
+          pelearse por el hueco. En escritorio, `sm:w-auto` los devuelve a la
+          misma línea y no cambia nada. */}
       <div
-        className={`flex flex-col gap-3 border-b border-ink-200 p-4 sm:flex-row sm:items-center sm:justify-between ${theme.softBg}`}
+        className={`flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-200 p-4 sm:justify-between ${theme.softBg}`}
       >
-        <div>
+        <div className="min-w-0 flex-1">
           <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${theme.badge}`}>
             Viaje {theme.label}
           </span>
@@ -103,20 +116,21 @@ export function ProposalDetailView({
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-2xl font-bold text-ink-900">{economicSummary.total}€</p>
-            <p className={`text-xs font-semibold ${isOverBudget ? "text-sunset-700" : "text-lagoon-700"}`}>
-              {isOverBudget
-                ? `Excede en ${Math.abs(economicSummary.remaining)}€`
-                : `Sobran ${economicSummary.remaining}€`}
-            </p>
-          </div>
+        <div className="flex-none text-right">
+          <p className="text-2xl font-bold text-ink-900">{economicSummary.total}€</p>
+          <p className={`text-xs font-semibold ${isOverBudget ? "text-sunset-700" : "text-lagoon-700"}`}>
+            {isOverBudget
+              ? `Excede en ${Math.abs(economicSummary.remaining)}€`
+              : `Sobran ${economicSummary.remaining}€`}
+          </p>
+        </div>
+
+        <div className="flex w-full flex-none items-center gap-2 sm:w-auto sm:gap-3">
           <button
             type="button"
             onClick={handleDownloadPdf}
             disabled={isGeneratingPdf}
-            className="flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-4 py-2.5 text-sm font-bold text-ink-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-60"
+            className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-2.5 text-sm font-bold text-ink-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-60 sm:flex-none sm:px-4"
           >
             <Icon name="download" size={15} />
             {isGeneratingPdf ? "Generando..." : "Descargar PDF"}
@@ -126,7 +140,7 @@ export function ProposalDetailView({
             <button
               type="button"
               onClick={onSave}
-              className={`rounded-full px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 ${theme.solidBg}`}
+              className={`min-h-[44px] flex-1 rounded-full px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 sm:flex-none sm:px-4 ${theme.solidBg}`}
             >
               Guardar viaje
             </button>
