@@ -34,6 +34,17 @@ export function routeKey(
   return `${profile}|${f}|${t}`;
 }
 
+// Cuántas claves caben en una consulta.
+//
+// PostgREST mete el filtro `in.(...)` en la URL, no en el cuerpo. Una
+// búsqueda normal pide 306 tramos y cada clave ocupa unos 60 bytes ya
+// escapada: 17,5 KB de URL, por encima del límite de 16 KB que undici (el
+// cliente HTTP de Node) impone a la cabecera. La petición ni salía.
+//
+// Con 100 claves la URL ronda los 6 KB, con margen de sobra aunque las
+// coordenadas crezcan.
+const MAX_KEYS_PER_QUERY = 100;
+
 // Best-effort como el resto de repositorios: sin Supabase configurado, o si
 // la consulta falla, se devuelve un mapa vacío y quien llama sigue adelante
 // calculando. La caché ahorra llamadas, no es un requisito.
@@ -44,17 +55,31 @@ export async function readCachedLegs(routeKeys: string[]): Promise<Map<string, C
     return found;
   }
 
-  const { data, error } = await db
-    .from("routes_cache")
-    .select("route_key, duration_seconds, distance_km")
-    .in("route_key", routeKeys);
-
-  if (error) {
-    console.error("[routes] Error leyendo la caché de rutas", error);
-    return found;
+  const lotes: string[][] = [];
+  for (let i = 0; i < routeKeys.length; i += MAX_KEYS_PER_QUERY) {
+    lotes.push(routeKeys.slice(i, i + MAX_KEYS_PER_QUERY));
   }
 
-  for (const row of data ?? []) {
+  // En paralelo: son lecturas independientes y encadenarlas multiplicaría la
+  // latencia por el número de lotes dentro de la petición del usuario.
+  const respuestas = await Promise.all(
+    lotes.map((lote) =>
+      db.from("routes_cache").select("route_key, duration_seconds, distance_km").in("route_key", lote),
+    ),
+  );
+
+  const data = [];
+  for (const respuesta of respuestas) {
+    if (respuesta.error) {
+      // Un lote que falle no invalida los demás: cada tramo que se rescate es
+      // una consulta menos al proveedor.
+      console.error("[routes] Error leyendo un lote de la caché de rutas", respuesta.error);
+      continue;
+    }
+    data.push(...(respuesta.data ?? []));
+  }
+
+  for (const row of data) {
     found.set(row.route_key, {
       routeKey: row.route_key,
       durationSeconds: row.duration_seconds,
