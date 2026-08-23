@@ -159,6 +159,8 @@ export interface GenerateTripResponse {
     // Coste de la opción más barata evaluada, viable o no: es lo que
     // permite decir cuánto falta cuando proposals viene vacío.
     cheapestTotalCost: number | null;
+    /** Aviso global del producto, común a todas las propuestas. */
+    disclaimer?: string;
   };
   proposals: TripProposal[];
 }

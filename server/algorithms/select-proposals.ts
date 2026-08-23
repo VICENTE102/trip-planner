@@ -124,10 +124,15 @@ function buildReasons(
   return reasons;
 }
 
+// Descargo que vale para TODAS las propuestas por igual, no para ninguna en
+// concreto. Viaja en metadata de la respuesta, no dentro de cada propuesta:
+// repetido tres veces en una comparativa es ruido, y además no compara nada.
+export const SIMULATED_DATA_DISCLAIMER =
+  "Datos simulados: vuelos, alojamiento y actividades son estimaciones generadas automáticamente, pendientes de verificación con proveedores reales.";
+
+// Solo lo que avisa de ESTA propuesta y no de las otras dos.
 function buildWarnings(combination: TripCombination): string[] {
-  const warnings: string[] = [
-    "Datos simulados: vuelos, alojamiento y actividades son estimaciones generadas automáticamente, pendientes de verificación con proveedores reales.",
-  ];
+  const warnings: string[] = [];
 
   if (!combination.flight.baggageIncluded) {
     warnings.push("El equipaje facturado no está incluido.");

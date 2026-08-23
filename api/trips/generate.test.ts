@@ -216,6 +216,33 @@ describe("POST /api/trips/generate", () => {
     expect(masCara(rica)).toBeGreaterThan(masCara(pobre));
   });
 
+  // El descargo de datos simulados vale para las tres propuestas por igual,
+  // así que se dice una vez en metadata. Repetido dentro de cada una era
+  // ruido en la comparativa y no comparaba nada.
+  it("el descargo general viaja en metadata, no dentro de cada propuesta", async () => {
+    const { payload } = await generar(PETICION);
+    const metadata = payload.metadata as { disclaimer?: string };
+    const proposals = payload.proposals as TripProposal[];
+
+    expect(metadata.disclaimer).toMatch(/Datos simulados/);
+    for (const p of proposals) {
+      expect(p.warnings.some((w) => w.includes("Datos simulados"))).toBe(false);
+    }
+  });
+
+  it("cada propuesta trae razones propias que explican su precio", async () => {
+    const proposals = (await generar(PETICION)).payload.proposals as TripProposal[];
+
+    for (const p of proposals) {
+      expect(p.reasons.length, `${p.type} llegó sin razones`).toBeGreaterThan(0);
+    }
+
+    // Y al menos una razón tiene que diferenciar: si las tres dijeran
+    // exactamente lo mismo, la comparativa volvería a no comparar nada.
+    const firmas = proposals.map((p) => p.reasons.join("|"));
+    expect(new Set(firmas).size).toBe(proposals.length);
+  });
+
   it("es determinista: la misma petición da el mismo resultado", async () => {
     const primera = (await generar(PETICION)).payload.proposals as TripProposal[];
     const segunda = (await generar(PETICION)).payload.proposals as TripProposal[];

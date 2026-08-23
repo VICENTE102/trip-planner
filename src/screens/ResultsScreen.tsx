@@ -50,7 +50,7 @@ export function ResultsScreen() {
     return <Navigate to="/" replace />;
   }
 
-  const { searchParams, proposals } = searchResult;
+  const { searchParams, proposals, disclaimer } = searchResult;
   const hasProposals = proposals.length > 0;
   const cheapestTotal = hasProposals ? Math.min(...proposals.map((p) => p.economicSummary.total)) : null;
   const activeProposal = proposals.find((p) => p.tier === activeTab);
@@ -160,6 +160,12 @@ export function ResultsScreen() {
               <div key={activeTab} className="animate-slide-in-trail pb-8">
                 {activeTab === "comparativa" ? (
                   <div className="flex flex-col gap-3">
+                    {disclaimer && (
+                      <p className="flex items-start gap-1.5 px-1 text-xs text-ink-500">
+                        <Icon name="alert" size={13} className="mt-0.5 flex-none text-ink-400" />
+                        <span>{disclaimer}</span>
+                      </p>
+                    )}
                     {proposals.map((proposal) => (
                       <ProposalCompareRow
                         key={proposal.tier}

@@ -30,7 +30,11 @@ import { nightsBetween } from "../utils/dates";
 // Lo que el motor calcula y aquí todavía se pierde, por no tener dónde
 // pintarlo: horas de inicio/fin, duraciones, desplazamientos entre sitios,
 // pausas, coste por actividad, enlaces de reserva por actividad, y los
-// campos score/rank/scoreBreakdown/reasons/warnings de cada propuesta.
+// campos score/rank/scoreBreakdown de cada propuesta.
+//
+// `reasons` y `warnings` sí llegan desde el Paso "sacar las razones a la
+// comparativa": son frases ya redactadas por el motor y eran lo más
+// desaprovechado de la respuesta.
 
 const TYPE_TO_TIER: Record<BackendTripProposal["type"], TierLevel> = {
   economical: "barato",
@@ -246,17 +250,38 @@ function toEconomicSummary(proposal: BackendTripProposal, budgetReference: numbe
   };
 }
 
+// Razones que NO se repiten en todas las propuestas.
+//
+// Se decide comparando los textos entre sí, no con una lista de frases
+// prohibidas: así sigue funcionando cuando el motor añada razones nuevas.
+// Hace falta porque hay al menos una que sale idéntica en las tres —"La
+// afinidad con la cultura y la gastronomía es alta"— y es lógico: se deriva
+// de las preferencias del usuario, no de la propuesta. En una comparativa
+// una línea repetida en las tres columnas no compara nada.
+export function pickDistinguishingReasons(reasons: string[], allProposalReasons: string[][]): string[] {
+  if (allProposalReasons.length < 2) {
+    return reasons;
+  }
+
+  return reasons.filter((reason) => !allProposalReasons.every((other) => other.includes(reason)));
+}
+
 export function toTripProposal(
   proposal: BackendTripProposal,
   searchParams: SearchParams,
+  allProposalReasons: string[][] = [],
 ): TripProposal {
   const nights = nightsBetween(searchParams.departureDate, searchParams.returnDate);
+  const reasons = proposal.reasons ?? [];
 
   return {
     tier: TYPE_TO_TIER[proposal.type],
     hotel: toHotel(proposal, nights),
     itinerary: toItinerary(proposal),
     economicSummary: toEconomicSummary(proposal, searchParams.budget),
+    reasons,
+    distinguishingReasons: pickDistinguishingReasons(reasons, allProposalReasons),
+    warnings: proposal.warnings ?? [],
   };
 }
 
@@ -266,9 +291,11 @@ export function toSearchResult(
   response: GenerateTripResponse,
   searchParams: SearchParams,
 ): SearchResult {
+  const allProposalReasons = response.proposals.map((proposal) => proposal.reasons ?? []);
+
   const proposals = response.proposals
-    .map((proposal) => toTripProposal(proposal, searchParams))
+    .map((proposal) => toTripProposal(proposal, searchParams, allProposalReasons))
     .sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier]);
 
-  return { searchParams, proposals };
+  return { searchParams, proposals, disclaimer: response.metadata.disclaimer };
 }

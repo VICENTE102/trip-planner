@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { tripRequestSchema } from "../../server/schemas/trip.schema.js";
 import { generateTripProposals } from "../../server/services/trip-planner.service.js";
+import { SIMULATED_DATA_DISCLAIMER } from "../../server/algorithms/select-proposals.js";
 import { persistTripGeneration } from "../../server/repositories/trip.repository.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -52,7 +53,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: requestId,
       status: "generated",
       request: requestSummary,
-      metadata: { evaluatedCombinations, discardedCombinations, cheapestTotalCost },
+      metadata: {
+        evaluatedCombinations,
+        discardedCombinations,
+        cheapestTotalCost,
+        // Aviso global del producto: aplica a las tres propuestas por igual,
+        // así que se dice una vez y no una por propuesta.
+        disclaimer: SIMULATED_DATA_DISCLAIMER,
+      },
       proposals,
     });
   } catch (error) {

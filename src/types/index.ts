@@ -143,10 +143,25 @@ export interface TripProposal {
   hotel: Hotel;
   itinerary: Itinerary;
   economicSummary: EconomicSummary;
+  // Frases ya redactadas por el motor a partir de sus propios números
+  // ("El alojamiento se encuentra a 1,9 km del centro"). Son lo que explica
+  // POR QUÉ esta propuesta cuesta lo que cuesta, y lo que convierte tres
+  // filas parecidas en tres opciones con argumento.
+  //
+  // `distinguishing` son las que NO se repiten en las otras propuestas: una
+  // razón idéntica en las tres no compara nada y solo diluye a las que sí.
+  reasons: string[];
+  distinguishingReasons: string[];
+  // Avisos propios de esta propuesta (sin equipaje, con escala, sin
+  // cancelación gratuita). El descargo general de datos simulados NO está
+  // aquí: viaja una sola vez en SearchResult.disclaimer.
+  warnings: string[];
 }
 
 export interface SearchResult {
   searchParams: SearchParams;
+  /** Aviso global del producto, válido para todas las propuestas. */
+  disclaimer?: string;
   proposals: TripProposal[];
 }
 

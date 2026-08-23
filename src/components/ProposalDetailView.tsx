@@ -39,7 +39,7 @@ export function ProposalDetailView({
 }: ProposalDetailViewProps) {
   const [section, setSection] = useState("itinerario");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const { tier, hotel, itinerary, economicSummary } = proposal;
+  const { tier, hotel, itinerary, economicSummary, reasons, warnings } = proposal;
   const theme = TIER_THEME[tier];
   const isOverBudget = economicSummary.remaining < 0;
 
@@ -133,6 +133,30 @@ export function ProposalDetailView({
           )}
         </div>
       </div>
+
+      {(reasons.length > 0 || warnings.length > 0) && (
+        <div className="border-t border-ink-100 px-4 pt-3">
+          <ul className="flex flex-col gap-1 text-sm text-ink-700 sm:flex-row sm:flex-wrap sm:gap-x-5">
+            {reasons.map((reason) => (
+              <li key={reason} className="flex items-start gap-1.5">
+                <Icon name="check" size={14} className="mt-0.5 flex-none text-lagoon-600" />
+                <span>{reason}</span>
+              </li>
+            ))}
+          </ul>
+
+          {warnings.length > 0 && (
+            <ul className="mt-1.5 flex flex-col gap-1 text-xs text-ink-500 sm:flex-row sm:flex-wrap sm:gap-x-5">
+              {warnings.map((warning) => (
+                <li key={warning} className="flex items-start gap-1.5">
+                  <Icon name="alert" size={13} className="mt-0.5 flex-none text-sunset-500" />
+                  <span>{warning}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="px-4 pt-3">
         <Tabs

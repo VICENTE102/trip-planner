@@ -7,11 +7,25 @@ interface ProposalCompareRowProps {
   onViewDetail: () => void;
 }
 
+// Cuántas razones caben sin que la fila crezca de más.
+const MAX_REASONS = 3;
+
 export function ProposalCompareRow({ proposal, onViewDetail }: ProposalCompareRowProps) {
-  const { tier, hotel, itinerary, economicSummary } = proposal;
+  const { tier, hotel, economicSummary, distinguishingReasons, warnings } = proposal;
   const theme = TIER_THEME[tier];
-  const highlightDay = itinerary.days.find((day) => !day.isArrivalDay) ?? itinerary.days[0];
   const isOverBudget = economicSummary.remaining < 0;
+
+  // Aquí antes se pintaba la mañana y la tarde del primer día. No comparaba
+  // nada —las tres propuestas compartían actividades— y con nombres reales
+  // salían cosas como "La Piccola Abbazia · Accademia Materiaviva - Scuola
+  // di teatro e circo - Roma". Las razones sí distinguen una opción de otra.
+  //
+  // SOLO las que distinguen, aunque la fila quede con dos líneas y la de al
+  // lado con tres. Rellenar el hueco con una razón común —"La afinidad con
+  // la cultura y la gastronomía es alta", que sale igual en las tres— la
+  // haría parecer un argumento propio de esa opción cuando no lo es. Las
+  // comunes siguen estando, completas, en el detalle.
+  const shown = distinguishingReasons.slice(0, MAX_REASONS);
 
   return (
     <div
@@ -27,15 +41,22 @@ export function ProposalCompareRow({ proposal, onViewDetail }: ProposalCompareRo
         </p>
       </div>
 
-      <div className="flex-1 text-sm text-ink-700">
-        <p className="flex items-center gap-1.5">
-          <Icon name="sun" size={14} className="flex-none text-sunset-500" />
-          {highlightDay.morning}
-        </p>
-        <p className="mt-1 flex items-center gap-1.5">
-          <Icon name="compass" size={14} className="flex-none text-lagoon-600" />
-          {highlightDay.afternoon}
-        </p>
+      <div className="flex-1">
+        <ul className="flex flex-col gap-1 text-sm text-ink-700">
+          {shown.map((reason) => (
+            <li key={reason} className="flex items-start gap-1.5">
+              <Icon name="check" size={14} className="mt-0.5 flex-none text-lagoon-600" />
+              <span>{reason}</span>
+            </li>
+          ))}
+        </ul>
+
+        {warnings.length > 0 && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-500">
+            <Icon name="alert" size={13} className="mt-0.5 flex-none text-sunset-500" />
+            <span>{warnings[0]}</span>
+          </p>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-4 sm:w-44 sm:flex-none sm:flex-col sm:items-end">
