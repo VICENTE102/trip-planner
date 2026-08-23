@@ -92,6 +92,79 @@ Con la línea recta a 20 km/h, el Coliseo y la Basílica de San Pedro salían a
 10 minutos cuando andando son 49. Y si la estimación sale peor que ir
 andando, se anda: es una opción real y es el dato que sí conocemos.
 
+## Cachés
+
+Tres tablas guardan lo que cuesta dinero o tiempo traer de fuera:
+`geocoding_cache`, `places` y `routes_cache`. La política de caducidad está en
+un solo sitio, `server/config/cache-policy.ts`, con un plazo distinto por tipo
+de dato porque las razones son distintas:
+
+| Dato | Plazo | Por qué |
+| --- | --- | --- |
+| Coordenadas encontradas | 365 días | El centro de Roma no se mueve |
+| Destino **no** encontrado | 30 días | Un mal día del proveedor no puede dejar un destino roto para siempre |
+| Tramos a pie | 180 días | Las calles cambian poco, pero cambian |
+| Sitios de Overture | 90 días | **Solo aviso**, ver abajo |
+
+El de "no encontrado" es el que justifica tener plazos separados. Un
+`found = false` se cachea a propósito —si no, cada falta de ortografía costaría
+una llamada— pero guardarlo para siempre significaba que si Geoapify fallaba
+una vez con un destino, nadie volvía a preguntar nunca.
+
+**`places` es la excepción y no debe caducar de verdad.** No es una caché que
+se rellene sola: Overture no es una API en vivo, la tabla se carga a mano con
+`npm run pois:load` y Vercel solo lee. Si una fila caducada se ignorase al
+leerla, el destino se quedaría sin lugares reales y el itinerario volvería a
+inventárselos con el mock, en silencio. Así que ahí "caducado" significa
+*avísame*, y quien avisa es el cargador:
+
+```
+3 destino(s) con sitios de más de 90 días:
+
+  Roma            118 días  (312 sitios)
+```
+
+### Saber si la caché sirve
+
+Cada búsqueda escribe una línea con su reparto real:
+
+```
+[cache] roma geocoding=1/1 (100%) places=1/1 (100%) routes=42/48 (88%)
+```
+
+Y lo suma a `cache_stats`, agregado por día, porque un contador en memoria no
+vale en Vercel (cada función puede arrancar en frío) y un log hay que ir a
+rebuscarlo. Para verlo:
+
+```sql
+select day, cache, hits, misses,
+       round(100.0 * hits / nullif(hits + misses, 0)) as porcentaje
+from cache_stats order by day desc, cache;
+```
+
+Un fallo al guardar estas cifras **nunca** tumba una búsqueda: la línea de log
+ya se escribió y medir no puede dejar a nadie sin viaje.
+
+### Vaciar un destino
+
+Para arreglar un dato malo sin entrar a la base de datos a mano. Es un script
+y no un endpoint porque borra datos y el Paso 8 iba de reducir superficie de
+ataque.
+
+```bash
+npm run cache:flush -- --destination=Roma              # qué se borraría
+npm run cache:flush -- --destination=Roma --confirm    # borra de verdad
+npm run cache:flush -- --destination=Roma --places --confirm
+```
+
+Sin `--confirm` no se borra nada: el fallo por descuido tiene que ser "no he
+borrado", nunca "he borrado lo que no era".
+
+`routes_cache` no tiene columna de destino —sus filas se identifican por
+coordenadas— así que se vacía por **caja geográfica**: 30 km alrededor del
+centro de la ciudad, que cubre cualquier itinerario urbano. Si de paso cae
+algún tramo de un pueblo vecino, se vuelve a calcular y ya está.
+
 ## Analítica y consentimiento
 
 Analítica de producto con [PostHog](https://posthog.com/) (1 M de eventos al

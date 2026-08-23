@@ -45,6 +45,29 @@ What travels to the UI is the **preference**, not the provider's `category`: the
 
 Photos are **per theme, not per place**: every museum in every city shares one photo. That keeps image API calls at zero, but reads odd now that places are real (the Museo Nazionale Etrusco under an aerial shot of Lübeck). Fixing it means a paid image search — the `website` column already stored for each Overture place is the likelier starting point.
 
+### Caches and expiry
+
+`server/config/cache-policy.ts` is the single place that says how long a cached
+value is worth. Four different TTLs because the reasons differ, and one of them
+is a trap: **`places` must never actually expire**. It is not a self-refilling
+cache — Overture is a GeoParquet drop loaded by hand with `npm run pois:load` —
+so dropping a stale row would leave the destination with no real places and
+send the itinerary silently back to the mock. There, "stale" means the loader
+prints a warning; the rows keep being served. Old is better than invented.
+
+The other trap it fixes: a `found = false` used to be cached forever, so one bad
+day at Geoapify broke a destination permanently.
+
+Cache hit rates go to `cache_stats` (daily, summed by a Postgres function like
+`increment_api_usage`) plus one log line per search. The tally is **passed as a
+parameter**, never a module variable: one Vercel instance can interleave two
+requests and a shared counter would blend two trips into one meaningless
+percentage. Failing to record stats never fails a search.
+
+`npm run cache:flush -- --destination=Roma` empties one destination; `--confirm`
+is required to actually delete. `routes_cache` has no destination column, so it
+is cleared by a 30 km bounding box around the city centre.
+
 ### Analytics and consent
 
 **Nothing is loaded or sent before the user accepts** — not even the PostHog script. `src/services/consent.ts` stores the choice; `src/services/analytics.ts` wraps PostHog behind it and queues events fired while the banner is still up, so the first funnel event (`formulario_iniciado`, which happens while the user is still deciding) is not lost. Rejecting discards the queue. `track()` never throws: no measurement may stop someone downloading their PDF.

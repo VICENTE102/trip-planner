@@ -14,6 +14,7 @@ import { buildTravelMatrixLookup } from "../algorithms/cluster-places.js";
 import { distributePlacesAcrossDays, scheduleDayActivities } from "../algorithms/schedule-itinerary.js";
 import { resolveCityCenter } from "./geocoding.service.js";
 import { resolveTravelMatrix } from "./routes.service.js";
+import { createCacheTally, reportCacheTally } from "./cache-stats.service.js";
 
 export interface GenerateTripResult {
   proposals: TripProposal[];
@@ -117,13 +118,18 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
   // — este cast solo alinea el tipo con esa garantía ya comprobada.
   const preferences = request.preferences as PreferenceProfile;
 
+  // Paso 9: el recuento de caché se crea aquí, uno por búsqueda, y se pasa a
+  // mano a los tres sitios que consultan caché. Ver cache-stats.service.ts
+  // para por qué no es una variable de módulo.
+  const tally = createCacheTally();
+
   // Paso 2: el centro real del destino se resuelve UNA vez por viaje
   // generado y se reparte a los proveedores que lo necesitan. Si cada
   // proveedor geocodificase por su cuenta, la misma ciudad se consultaría
   // dos veces por búsqueda. Va antes del Promise.all porque ambas búsquedas
   // dependen de él; los vuelos no, pero paralelizarlos por separado no
   // compensa la complejidad cuando la caché resuelve esto en milisegundos.
-  const center = await resolveCityCenter(request.destination);
+  const center = await resolveCityCenter(request.destination, tally);
 
   const [flights, accommodations, activities] = await Promise.all([
     mockFlightProvider.searchFlights({
@@ -142,11 +148,14 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
       adults: request.travelers.adults,
       children: request.travelers.children,
     }),
-    placesProvider.searchActivities({
-      destination: request.destination,
-      center,
-      preferences,
-    }),
+    placesProvider.searchActivities(
+      {
+        destination: request.destination,
+        center,
+        preferences,
+      },
+      tally,
+    ),
   ]);
 
   const providerSearches: ProviderSearchLog[] = [
@@ -215,7 +224,7 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
     ).values(),
   ].slice(0, MAX_HOTELS_IN_MATRIX);
 
-  const travelMatrix = await resolveTravelMatrix([...hotelPlaces, ...activityPlaces]);
+  const travelMatrix = await resolveTravelMatrix([...hotelPlaces, ...activityPlaces], tally);
   const travelLookup = buildTravelMatrixLookup(travelMatrix);
   const travelLeg = (fromId: string, toId: string) => travelLookup.get(`${fromId}->${toId}`);
 
@@ -247,6 +256,11 @@ export async function generateTripProposals(request: ValidatedTripRequest): Prom
           userBudget: request.budget,
           preferences,
         });
+
+  // Se publica al final y no se espera al resultado en el camino crítico:
+  // medir si la caché funciona no puede añadir latencia a la respuesta ni,
+  // mucho menos, tumbarla. reportCacheTally nunca lanza.
+  await reportCacheTally(tally, request.destination);
 
   return {
     proposals,

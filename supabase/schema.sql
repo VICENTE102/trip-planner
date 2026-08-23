@@ -175,6 +175,49 @@ begin
 end;
 $$;
 
+-- Aciertos y fallos de caché, agregados por día.
+--
+-- Existe porque toda la estrategia de coste del proyecto depende de que las
+-- cachés funcionen, y sin esto no había forma de saberlo: los contadores en
+-- memoria no sirven en Vercel, donde cada función puede arrancar en frío, y
+-- una línea de log hay que ir a rebuscarla. Esto se consulta con un select.
+--
+--   select day, cache, hits, misses,
+--          round(100.0 * hits / nullif(hits + misses, 0)) as porcentaje
+--   from cache_stats order by day desc, cache;
+create table if not exists cache_stats (
+  day date not null,
+  cache text not null,
+  hits integer not null default 0,
+  misses integer not null default 0,
+  primary key (day, cache)
+);
+
+-- Misma razón que increment_api_usage: la suma ocurre dentro de Postgres
+-- para que dos búsquedas simultáneas no se pisen. Recibe las tres cachés de
+-- una sola búsqueda juntas, en un array de objetos, para gastar una única ida
+-- y vuelta dentro de la petición del usuario en vez de tres.
+--
+--   select increment_cache_stats('[{"cache":"routes","hits":42,"misses":6}]'::jsonb);
+create or replace function increment_cache_stats(p_stats jsonb)
+returns void
+language plpgsql
+as $$
+begin
+  insert into cache_stats (day, cache, hits, misses)
+  select
+    current_date,
+    stat->>'cache',
+    coalesce((stat->>'hits')::integer, 0),
+    coalesce((stat->>'misses')::integer, 0)
+  from jsonb_array_elements(p_stats) as stat
+  on conflict (day, cache)
+  do update set
+    hits = cache_stats.hits + excluded.hits,
+    misses = cache_stats.misses + excluded.misses;
+end;
+$$;
+
 alter table trip_requests enable row level security;
 alter table trip_proposals enable row level security;
 alter table provider_searches enable row level security;
@@ -182,11 +225,13 @@ alter table geocoding_cache enable row level security;
 alter table places enable row level security;
 alter table routes_cache enable row level security;
 alter table api_usage enable row level security;
+alter table cache_stats enable row level security;
 
 -- Las claves API nuevas de Supabase (sb_secret_...) no heredan en automático
 -- los privilegios por defecto sobre tablas nuevas del rol service_role, así
 -- que hay que concedérselos explícitamente (RLS activado arriba sigue
 -- bloqueando anon/authenticated; service_role la salta siempre por diseño).
-grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache, places, routes_cache, api_usage to service_role;
+grant select, insert, update, delete on trip_requests, trip_proposals, provider_searches, geocoding_cache, places, routes_cache, api_usage, cache_stats to service_role;
 grant execute on function increment_api_usage(text) to service_role;
+grant execute on function increment_cache_stats(jsonb) to service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to service_role;

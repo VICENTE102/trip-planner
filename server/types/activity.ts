@@ -1,5 +1,6 @@
 import type { PreferenceProfile, TravelPreference } from "./trip.js";
 import type { Coordinates } from "./geocoding.js";
+import type { CacheTally } from "../services/cache-stats.service.js";
 
 export interface OpeningPeriod {
   dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -40,5 +41,9 @@ export interface ActivitySearchRequest {
 }
 
 export interface PlacesProvider {
-  searchActivities(request: ActivitySearchRequest): Promise<ActivityCandidate[]>;
+  /**
+   * `tally` es opcional a propósito: los proveedores simulados no consultan
+   * ninguna caché y las pruebas no tienen por qué construir uno.
+   */
+  searchActivities(request: ActivitySearchRequest, tally?: CacheTally): Promise<ActivityCandidate[]>;
 }

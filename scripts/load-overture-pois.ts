@@ -46,6 +46,15 @@ const MAX_PER_PREFERENCE = 40;
 // puntuar, no 40 veces lo mismo.
 const MAX_PER_CATEGORY = 12;
 const INSERT_BATCH = 500;
+// Debe coincidir con CACHE_TTL_DAYS.placesStale (server/config/cache-policy.ts).
+// Está repetido porque este script es autónomo a propósito y no importa nada
+// de server/; son 90 días y un comentario, no merece un módulo compartido.
+const STALE_AFTER_DAYS = 90;
+
+// Destinos que ya están cargados pero llevan demasiado tiempo sin refrescarse.
+// Se acumulan para poder resumirlos al final, en vez de que el aviso se pierda
+// entre veinte líneas de salida.
+const stale: { name: string; days: number; count: number }[] = [];
 
 const args = process.argv.slice(2);
 const INSPECT = args.includes("--inspect");
@@ -191,8 +200,37 @@ async function load(destination: DestinationSeed): Promise<void> {
       .from("places")
       .select("id", { count: "exact", head: true })
       .eq("destination_key", key);
+
     if ((count ?? 0) > 0) {
-      console.log(`- ${destination.name}: ya tiene ${count} sitios, se omite (usa --force para recargar)`);
+      // Paso 9: la caducidad de `places` es un AVISO, no una expulsión.
+      //
+      // Es la diferencia importante con las otras dos cachés. Si un sitio
+      // caducado se ignorase al leerlo, el destino se quedaría sin lugares
+      // reales y el itinerario volvería a inventárselos con el mock, en
+      // silencio y de un día para otro. Overture no es una API en vivo: nadie
+      // repone esa fila salvo este script, ejecutado a mano. Así que lo único
+      // sensato es decirlo aquí, que es donde alguien puede actuar.
+      const { data: masAntiguo } = await supabase
+        .from("places")
+        .select("loaded_at")
+        .eq("destination_key", key)
+        .order("loaded_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      const dias = masAntiguo?.loaded_at
+        ? Math.floor((Date.now() - Date.parse(masAntiguo.loaded_at)) / 86_400_000)
+        : undefined;
+
+      if (dias !== undefined && dias > STALE_AFTER_DAYS) {
+        stale.push({ name: destination.name, days: dias, count: count ?? 0 });
+        console.log(
+          `- ${destination.name}: ${count} sitios cargados hace ${dias} días, CONVIENE RECARGAR (--force)`,
+        );
+      } else {
+        const edad = dias !== undefined ? `, cargados hace ${dias} días` : "";
+        console.log(`- ${destination.name}: ya tiene ${count} sitios${edad}, se omite (usa --force para recargar)`);
+      }
       return;
     }
   }
@@ -298,6 +336,16 @@ for (const destination of targets) {
     // Un destino que falle no debe tumbar la carga de los demás.
     console.error(`  ! ${destination.name}: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+// El resumen va al final para que el aviso no se pierda entre la salida de la
+// carga. Los sitios viejos se siguen sirviendo: viejo es mejor que inventado.
+if (stale.length > 0) {
+  console.log(`\n${stale.length} destino(s) con sitios de más de ${STALE_AFTER_DAYS} días:\n`);
+  for (const viejo of stale.sort((a, b) => b.days - a.days)) {
+    console.log(`  ${viejo.name.padEnd(14)} ${String(viejo.days).padStart(4)} días  (${viejo.count} sitios)`);
+  }
+  console.log(`\nRecárgalos con:  npm run pois:load -- --force --only=<destino>`);
 }
 
 console.log("\nListo.");

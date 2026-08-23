@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "../config/supabase.js";
+import { CACHE_TTL_DAYS, isExpired } from "../config/cache-policy.js";
 
 export interface CachedLeg {
   routeKey: string;
@@ -64,7 +65,7 @@ export async function readCachedLegs(routeKeys: string[]): Promise<Map<string, C
   // latencia por el número de lotes dentro de la petición del usuario.
   const respuestas = await Promise.all(
     lotes.map((lote) =>
-      db.from("routes_cache").select("route_key, duration_seconds, distance_km").in("route_key", lote),
+      db.from("routes_cache").select("route_key, duration_seconds, distance_km, created_at").in("route_key", lote),
     ),
   );
 
@@ -80,6 +81,12 @@ export async function readCachedLegs(routeKeys: string[]): Promise<Map<string, C
   }
 
   for (const row of data) {
+    // Las calles cambian poco, pero cambian: obras, una plaza que se
+    // peatonaliza. Un tramo viejo se deja fuera y se vuelve a pedir, que es
+    // lo que la caché sabe hacer sola.
+    if (isExpired(row.created_at, CACHE_TTL_DAYS.routes)) {
+      continue;
+    }
     found.set(row.route_key, {
       routeKey: row.route_key,
       durationSeconds: row.duration_seconds,
@@ -108,6 +115,10 @@ export async function writeCachedLegs(legs: LegToCache[]): Promise<void> {
       duration_seconds: leg.durationSeconds,
       distance_km: leg.distanceKm,
       provider: leg.provider,
+      // Igual que en geocoding_cache: el upsert no toca lo que no se le pasa,
+      // así que sin esto un tramo caducado se recalcularía en cada búsqueda
+      // sin renovar nunca su fecha.
+      created_at: new Date().toISOString(),
     })),
     { onConflict: "route_key" },
   );

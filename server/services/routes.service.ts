@@ -8,6 +8,7 @@ import {
 } from "../providers/openrouteservice-routes.provider.js";
 import { readCachedLegs, routeKey, writeCachedLegs, type LegToCache } from "../repositories/routes.repository.js";
 import { canCallProvider, recordProviderCall } from "./usage.service.js";
+import { recordCacheHit, recordCacheMiss, type CacheTally } from "./cache-stats.service.js";
 
 // Por encima de este tiempo andando, el trayecto deja de ser "un paseo entre
 // dos museos" y pasa a ser algo que cualquiera haría en metro. Como la API
@@ -99,7 +100,7 @@ function entryFromRealLeg(
 // Nunca lanza: un itinerario no puede quedarse sin construir porque el
 // servicio de rutas esté caído. En el peor caso se degrada a la estimación
 // en línea recta, que es exactamente el comportamiento anterior al Paso 5.
-export async function resolveTravelMatrix(places: RoutePlace[]): Promise<TravelMatrixEntry[]> {
+export async function resolveTravelMatrix(places: RoutePlace[], tally?: CacheTally): Promise<TravelMatrixEntry[]> {
   // La estimación en línea recta se calcula siempre: es gratis y es el
   // respaldo de cada par que no se pueda resolver de verdad. Lo que NO hace
   // ya es decidir los trayectos largos — de eso se encarga entryFromRealLeg
@@ -129,6 +130,12 @@ export async function resolveTravelMatrix(places: RoutePlace[]): Promise<TravelM
     const [fromId, toId] = pair.split("->");
     resolved.set(pair, entryFromRealLeg(fromId, toId, hit.durationSeconds, hit.distanceKm));
   }
+
+  // Se cuenta por PARES, no por búsqueda: es la unidad que se paga. Una
+  // búsqueda que resuelve 42 de 48 tramos desde la caché ahorra 42 consultas
+  // aunque acabe llamando a ORS igualmente por los 6 restantes.
+  recordCacheHit(tally, "routes", resolved.size);
+  recordCacheMiss(tally, "routes", keyByPair.size - resolved.size);
 
   const allResolved = resolved.size === keyByPair.size;
   const provider = getRealProvider();

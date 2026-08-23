@@ -3,6 +3,7 @@ import { getGeoapifyApiKey } from "../config/env.js";
 import { createGeoapifyGeocodingProvider } from "../providers/geoapify-geocoding.provider.js";
 import { mockGeocodingProvider } from "../providers/mock-geocoding.provider.js";
 import { readCachedGeocoding, writeCachedGeocoding } from "../repositories/geocoding.repository.js";
+import { recordCacheHit, recordCacheMiss, type CacheTally } from "./cache-stats.service.js";
 import { normalizeCityName } from "../utils/text.js";
 import { canCallProvider, recordProviderCall } from "./usage.service.js";
 
@@ -39,7 +40,7 @@ async function mockCenter(destination: string): Promise<Coordinates> {
 // porque un geocodificador esté caído. En el peor caso se degrada al centro
 // simulado de siempre, que es exactamente el comportamiento anterior al
 // Paso 2.
-export async function resolveCityCenter(destination: string): Promise<Coordinates> {
+export async function resolveCityCenter(destination: string, tally?: CacheTally): Promise<Coordinates> {
   const key = normalizeCityName(destination);
   if (key === "") {
     return mockCenter(destination);
@@ -47,15 +48,21 @@ export async function resolveCityCenter(destination: string): Promise<Coordinate
 
   const remembered = memoryCache.get(key);
   if (remembered !== undefined) {
+    recordCacheHit(tally, "geocoding");
     return remembered ? remembered.coordinates : mockCenter(destination);
   }
 
   const cached = await readCachedGeocoding(key);
   if (cached) {
+    recordCacheHit(tally, "geocoding");
     const city = cached.found ? cached.city : null;
     memoryCache.set(key, city);
     return city ? city.coordinates : mockCenter(destination);
   }
+
+  // A partir de aquí hay que resolverlo fuera, con clave o sin ella: para la
+  // caché es un fallo en cualquier caso.
+  recordCacheMiss(tally, "geocoding");
 
   const provider = getRealProvider();
   // Paso 8: por encima del tope diario se deja de llamar al proveedor real.

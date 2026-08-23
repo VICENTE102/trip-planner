@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "../config/supabase.js";
+import { CACHE_TTL_DAYS, isExpired } from "../config/cache-policy.js";
 import type { GeocodedCity } from "../types/geocoding.js";
 
 // Una entrada de la caché: o la ciudad se encontró (found: true, con
@@ -18,7 +19,7 @@ export async function readCachedGeocoding(destinationKey: string): Promise<Cache
 
   const { data, error } = await db
     .from("geocoding_cache")
-    .select("latitude, longitude, formatted_name, country_code, found")
+    .select("latitude, longitude, formatted_name, country_code, found, created_at")
     .eq("destination_key", destinationKey)
     .maybeSingle();
 
@@ -29,6 +30,18 @@ export async function readCachedGeocoding(destinationKey: string): Promise<Cache
   if (!data) {
     return undefined;
   }
+
+  // El plazo depende de lo que se guardó, no de la tabla.
+  //
+  // Un "no encontrado" caduca en un mes y unas coordenadas buenas duran un
+  // año, y la diferencia no es cosmética: sin ella, un mal día de Geoapify
+  // con un destino lo dejaba roto PARA SIEMPRE. La fila decía "esa ciudad no
+  // existe" y nadie volvía a preguntar nunca.
+  const ttl = data.found ? CACHE_TTL_DAYS.geocodingFound : CACHE_TTL_DAYS.geocodingNotFound;
+  if (isExpired(data.created_at, ttl)) {
+    return undefined;
+  }
+
   if (!data.found) {
     return { found: false };
   }
@@ -73,6 +86,12 @@ export async function writeCachedGeocoding(params: {
       country_code: city?.countryCode ?? null,
       found: city !== undefined,
       provider,
+      // Se refresca al reescribir. Sin esto, `created_at` conserva la fecha
+      // del primer insert (el upsert no toca las columnas que no le pasas) y
+      // una fila caducada se quedaría caducada PARA SIEMPRE: volvería a
+      // preguntarse en cada búsqueda sin dejar nunca de estar vencida. La
+      // caducidad pasaría de arreglar un destino roto a hacerlo caro.
+      created_at: new Date().toISOString(),
     },
     { onConflict: "destination_key" },
   );

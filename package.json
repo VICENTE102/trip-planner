@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "pois:inspect": "node --env-file=.env.local scripts/load-overture-pois.ts --inspect --only=Roma",
     "pois:load": "node --env-file=.env.local scripts/load-overture-pois.ts",
+    "cache:flush": "node --env-file=.env.local scripts/flush-cache.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "node --env-file-if-exists=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts"
