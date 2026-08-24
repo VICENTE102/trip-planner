@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { DayMeal, ItineraryDay, Restaurant, SearchParams, TierLevel } from "../types";
 import { formatDate } from "../utils/dates";
+import { isEmptySlot } from "../utils/emptySlot";
 import {
   clearDayTextEdit,
   clearRestaurantEdit,
@@ -194,6 +195,52 @@ function EditControls({
   );
 }
 
+// Una franja sin plan, dicha en una línea.
+//
+// Antes era un TimelineNode entero: título, hueco de imagen del tamaño de una
+// foto y la frase "Tarde sin actividades programadas.". Todo el aparato de un
+// bloque con contenido para decir que no lo hay. Medido en un itinerario de
+// Roma, esa frase salía SIETE veces en una pantalla.
+//
+// Es el mismo criterio que se aplicó a la banda de noche y a las comidas: el
+// espacio y el contraste se los gana el contenido, no su ausencia. El punto
+// del marcador se mantiene para que la línea de tiempo no se corte.
+function EmptySlot({
+  icon,
+  title,
+  markerClass,
+  editable,
+  onAdd,
+}: {
+  icon: IconName;
+  title: string;
+  markerClass: string;
+  editable?: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="relative flex items-center gap-3">
+      <div
+        className={`relative z-10 flex h-7 w-7 flex-none items-center justify-center rounded-full text-white opacity-40 ${markerClass}`}
+      >
+        <Icon name={icon} size={14} />
+      </div>
+      <p className="flex flex-1 items-center justify-between gap-2 text-sm text-ink-400">
+        <span>{title} libre</span>
+        {editable && (
+          <button
+            type="button"
+            onClick={onAdd}
+            className="min-h-[44px] text-xs font-semibold text-ink-500 underline-offset-2 hover:underline"
+          >
+            Añadir plan
+          </button>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function MealNode({ meal, imageOnRight }: { meal: DayMeal; imageOnRight: boolean }) {
   return (
     <TimelineNode
@@ -201,10 +248,16 @@ function MealNode({ meal, imageOnRight }: { meal: DayMeal; imageOnRight: boolean
       markerClass="bg-ink-500"
       title={`${meal.title} · ${meal.time}`}
       titleColorClass="text-ink-500"
+      // Antes cada comida terminaba en "Aún sin restaurante asignado." Con dos
+      // comidas por día y cinco días en pantalla, la disculpa salía DIEZ veces
+      // y el único dato útil —el presupuesto— quedaba detrás de ella.
+      //
+      // Que no proponemos restaurantes concretos se dice ahora una sola vez
+      // por itinerario, en ItineraryNote. Aquí queda lo que aporta algo.
       text={
         meal.costPerPerson !== undefined
-          ? `Presupuesto estimado de ${meal.costPerPerson}€ por persona. Aún sin restaurante asignado.`
-          : "Aún sin restaurante asignado."
+          ? `Presupuesto estimado de ${meal.costPerPerson}€ por persona.`
+          : "Presupuesto de comida incluido en el total."
       }
       imageSrc={null}
       imageFallbackIcon={RESTAURANT_FALLBACK_ICON}
@@ -224,6 +277,8 @@ interface TimelineNodeProps {
   imageFallbackIcon: IconName;
   imageShape: "square" | "circle";
   imageOnRight: boolean;
+  /** Ni foto ni icono: esta franja no es la que ilustra el día. */
+  hideThumbnail?: boolean;
   action?: React.ReactNode;
   editable?: boolean;
   isEdited?: boolean;
@@ -243,6 +298,7 @@ function TimelineNode({
   imageFallbackIcon,
   imageShape,
   imageOnRight,
+  hideThumbnail,
   action,
   editable,
   isEdited,
@@ -259,7 +315,12 @@ function TimelineNode({
         <Icon name={icon} size={14} filled />
       </div>
       <div className={`flex flex-1 gap-3 ${imageOnRight && !isEditing ? "flex-row-reverse" : ""}`}>
-        {!isEditing && (
+        {/* Sin miniatura cuando esta franja no es la que lleva la foto del
+            día. El icono de reserva dejaría un recuadro grande y vacío para
+            no decir nada: es el mismo error del que venimos, en pequeño.
+            `hideThumbnail` distingue "esta franja no ilustra" de "la imagen
+            no cargó", que sí merece su icono. */}
+        {!isEditing && !hideThumbnail && (
           <Thumbnail
             src={imageSrc}
             alt={text}
@@ -304,6 +365,29 @@ export function DayCard({
   const morningText = getEffectiveText(day, "morning");
   const afternoonText = getEffectiveText(day, "afternoon");
   const nightText = getEffectiveText(day, "night");
+  // "Noche sin actividades programadas." es lo que escribe el adaptador
+  // cuando la franja viene vacía. Una edición del usuario cuenta como plan
+  // aunque diga poco: si se ha molestado en escribirla, merece verse.
+  const hasNightPlan = !isEmptySlot(nightText);
+  const hasMorningPlan = !isEmptySlot(morningText);
+  const hasAfternoonPlan = !isEmptySlot(afternoonText);
+
+  // UNA foto por tarjeta, la del tema dominante del día.
+  //
+  // Antes había una por franja, y como mañana y tarde suelen compartir tema,
+  // salía la misma imagen dos veces en la misma tarjeta y muchas más en la
+  // rejilla: medido en un itinerario de Roma, 10 fotos y solo 6 distintas,
+  // con una repetida CUATRO veces.
+  //
+  // No se pierde información al quitarlas: la foto no es del sitio, es
+  // genérica del tema, y el tema ya lo dice la etiqueta de la esquina
+  // ("Explora", "Sabores"). Repetía lo que ya estaba dicho. La franja que se
+  // queda sin foto cae en su icono, que es más discreto y no miente menos.
+  const dayImageSlot: "morning" | "afternoon" | null = getActivityImage(day.morningActivityId)
+    ? "morning"
+    : getActivityImage(day.afternoonActivityId)
+      ? "afternoon"
+      : null;
   const restaurant = getEffectiveRestaurant(day);
 
   // La tarjeta tiene un orden fijo (mañana → tarde → noche), así que las
@@ -358,41 +442,52 @@ export function DayCard({
             aria-hidden="true"
           />
 
-          <TimelineNode
-            icon="sun"
-            markerClass={theme.solidBg}
-            title="Mañana"
-            titleColorClass="text-sunset-600"
-            text={morningText}
-            imageSrc={getActivityImage(day.morningActivityId)}
-            imageFallbackIcon={ACTIVITY_FALLBACK_ICON}
-            imageShape="square"
-            imageOnRight={imageOnRight}
-            editable={editable}
-            isEdited={isFieldEdited(day, "morning")}
-            isEditing={editingField === "morning"}
-            onStartEdit={() => setEditingField("morning")}
-            onRestore={() => restoreTextField("morning")}
-            editSlot={
-              <TextEditForm
-                initialValue={morningText}
-                onSave={(value) => saveTextField("morning", value)}
-                onCancel={() => setEditingField(null)}
-              />
-            }
-            action={
-              !day.isArrivalDay && (
-                <ExternalLinkButton
-                  href={getActivityLink(morningText, searchParams.destination)}
-                  label="Reservar actividad"
-                  icon="compass"
-                  variant="activity"
-                  category="actividad"
-                  destination={searchParams.destination}
+          {hasMorningPlan || editingField === "morning" ? (
+            <TimelineNode
+              icon="sun"
+              markerClass={theme.solidBg}
+              title="Mañana"
+              titleColorClass="text-sunset-600"
+              text={morningText}
+              imageSrc={getActivityImage(day.morningActivityId)}
+              hideThumbnail={dayImageSlot !== "morning"}
+              imageFallbackIcon={ACTIVITY_FALLBACK_ICON}
+              imageShape="square"
+              imageOnRight={imageOnRight}
+              editable={editable}
+              isEdited={isFieldEdited(day, "morning")}
+              isEditing={editingField === "morning"}
+              onStartEdit={() => setEditingField("morning")}
+              onRestore={() => restoreTextField("morning")}
+              editSlot={
+                <TextEditForm
+                  initialValue={morningText}
+                  onSave={(value) => saveTextField("morning", value)}
+                  onCancel={() => setEditingField(null)}
                 />
-              )
-            }
-          />
+              }
+              action={
+                !day.isArrivalDay && (
+                  <ExternalLinkButton
+                    href={getActivityLink(morningText, searchParams.destination)}
+                    label="Reservar actividad"
+                    icon="compass"
+                    variant="activity"
+                    category="actividad"
+                    destination={searchParams.destination}
+                  />
+                )
+              }
+            />
+          ) : (
+            <EmptySlot
+              icon="sun"
+              title="Mañana"
+              markerClass={theme.solidBg}
+              editable={editable}
+              onAdd={() => setEditingField("morning")}
+            />
+          )}
 
           {restaurant ? (
             <TimelineNode
@@ -431,41 +526,52 @@ export function DayCard({
             ))
           )}
 
-          <TimelineNode
-            icon="compass"
-            markerClass={theme.solidBg}
-            title="Tarde"
-            titleColorClass="text-lagoon-600"
-            text={afternoonText}
-            imageSrc={getActivityImage(day.afternoonActivityId)}
-            imageFallbackIcon={ACTIVITY_FALLBACK_ICON}
-            imageShape="square"
-            imageOnRight={imageOnRight}
-            editable={editable}
-            isEdited={isFieldEdited(day, "afternoon")}
-            isEditing={editingField === "afternoon"}
-            onStartEdit={() => setEditingField("afternoon")}
-            onRestore={() => restoreTextField("afternoon")}
-            editSlot={
-              <TextEditForm
-                initialValue={afternoonText}
-                onSave={(value) => saveTextField("afternoon", value)}
-                onCancel={() => setEditingField(null)}
-              />
-            }
-            action={
-              !day.isArrivalDay && (
-                <ExternalLinkButton
-                  href={getActivityLink(afternoonText, searchParams.destination)}
-                  label="Reservar actividad"
-                  icon="compass"
-                  variant="activity"
-                  category="actividad"
-                  destination={searchParams.destination}
+          {hasAfternoonPlan || editingField === "afternoon" ? (
+            <TimelineNode
+              icon="compass"
+              markerClass={theme.solidBg}
+              title="Tarde"
+              titleColorClass="text-lagoon-600"
+              text={afternoonText}
+              imageSrc={getActivityImage(day.afternoonActivityId)}
+              hideThumbnail={dayImageSlot !== "afternoon"}
+              imageFallbackIcon={ACTIVITY_FALLBACK_ICON}
+              imageShape="square"
+              imageOnRight={imageOnRight}
+              editable={editable}
+              isEdited={isFieldEdited(day, "afternoon")}
+              isEditing={editingField === "afternoon"}
+              onStartEdit={() => setEditingField("afternoon")}
+              onRestore={() => restoreTextField("afternoon")}
+              editSlot={
+                <TextEditForm
+                  initialValue={afternoonText}
+                  onSave={(value) => saveTextField("afternoon", value)}
+                  onCancel={() => setEditingField(null)}
                 />
-              )
-            }
-          />
+              }
+              action={
+                !day.isArrivalDay && (
+                  <ExternalLinkButton
+                    href={getActivityLink(afternoonText, searchParams.destination)}
+                    label="Reservar actividad"
+                    icon="compass"
+                    variant="activity"
+                    category="actividad"
+                    destination={searchParams.destination}
+                  />
+                )
+              }
+            />
+          ) : (
+            <EmptySlot
+              icon="compass"
+              title="Tarde"
+              markerClass={theme.solidBg}
+              editable={editable}
+              onAdd={() => setEditingField("afternoon")}
+            />
+          )}
 
           {eveningMeals.map((meal) => (
             <MealNode key={meal.id} meal={meal} imageOnRight={imageOnRight} />
@@ -473,32 +579,59 @@ export function DayCard({
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-ink-900 to-[#2e1f45] px-4 py-3 text-white">
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-white/70">
-            <Icon name="moon" size={13} />
-            Noche
-          </p>
-          {editable && editingField !== "night" && (
-            <EditControls
-              isEdited={isFieldEdited(day, "night")}
-              onEdit={() => setEditingField("night")}
-              onRestore={() => restoreTextField("night")}
-              dark
+      {/* La banda de noche era el elemento de MÁS contraste de la tarjeta
+          —degradado oscuro, texto blanco— y en un viaje normal las ocho
+          decían lo mismo: que no hay nada. Medido: 64px de una tarjeta de
+          506, ocho veces en pantalla, 512px de franja oscura para no decir
+          nada. El mayor peso visual para el contenido más vacío.
+
+          Cuando hay plan de noche se queda entera: ahí sí se ha ganado el
+          peso. Cuando no lo hay, y no se está editando, se colapsa a una
+          línea discreta que sigue permitiendo añadirlo. */}
+      {hasNightPlan || editingField === "night" ? (
+        <div className="bg-gradient-to-r from-ink-900 to-[#2e1f45] px-4 py-3 text-white">
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-white/70">
+              <Icon name="moon" size={13} />
+              Noche
+            </p>
+            {editable && editingField !== "night" && (
+              <EditControls
+                isEdited={isFieldEdited(day, "night")}
+                onEdit={() => setEditingField("night")}
+                onRestore={() => restoreTextField("night")}
+                dark
+              />
+            )}
+          </div>
+          {editingField === "night" ? (
+            <TextEditForm
+              variant="dark"
+              initialValue={nightText}
+              onSave={(value) => saveTextField("night", value)}
+              onCancel={() => setEditingField(null)}
             />
+          ) : (
+            <p className="mt-1 text-sm text-white/90">{nightText}</p>
           )}
         </div>
-        {editingField === "night" ? (
-          <TextEditForm
-            variant="dark"
-            initialValue={nightText}
-            onSave={(value) => saveTextField("night", value)}
-            onCancel={() => setEditingField(null)}
-          />
-        ) : (
-          <p className="mt-1 text-sm text-white/90">{nightText}</p>
-        )}
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2 border-t border-ink-100 px-4 py-2 text-xs text-ink-400">
+          <span className="flex items-center gap-1.5">
+            <Icon name="moon" size={12} />
+            Noche libre
+          </span>
+          {editable && (
+            <button
+              type="button"
+              onClick={() => setEditingField("night")}
+              className="min-h-[44px] font-semibold text-ink-500 underline-offset-2 hover:underline"
+            >
+              Añadir plan
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

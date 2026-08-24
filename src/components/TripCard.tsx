@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { Trip } from "../types";
 import { Icon } from "./Icon";
 import { TIER_THEME } from "../constants/tierTheme";
+import { formatDateRange } from "../utils/dates";
 
 interface TripCardProps {
   trip: Trip;
@@ -25,7 +26,7 @@ export function TripCard({ trip, onDelete }: TripCardProps) {
             {searchParams.destination}
           </h3>
           <p className="mt-1 text-sm text-ink-500">
-            {searchParams.departureDate} → {searchParams.returnDate} ·{" "}
+            {formatDateRange(searchParams.departureDate, searchParams.returnDate)} ·{" "}
             {proposal.itinerary.totalNights} noches
           </p>
           <p className="text-sm text-ink-700">{proposal.hotel.name}</p>

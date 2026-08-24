@@ -21,6 +21,7 @@ import type {
   TripProposal as BackendTripProposal,
 } from "./trip-api.client";
 import { nightsBetween } from "../utils/dates";
+import { EMPTY_SLOT_TEXT } from "../utils/emptySlot";
 
 // Única traducción entre el contrato del backend (server/types, orientado al
 // motor: ofertas, bloques con hora, desglose de presupuesto en 7 partidas) y
@@ -204,7 +205,7 @@ function toDay(backendDay: BackendItineraryDay, isArrivalDay: boolean): Itinerar
       ? joinTitles(morningVisits)
       : isArrivalDay && arrivalItems.length > 0
         ? joinTitles(arrivalItems)
-        : "Mañana sin actividades programadas.";
+        : EMPTY_SLOT_TEXT.morning;
 
   const meals: DayMeal[] = items
     .filter((item) => item.type === "meal")
@@ -248,9 +249,9 @@ function toDay(backendDay: BackendItineraryDay, isArrivalDay: boolean): Itinerar
           ? "llegada"
           : UNKNOWN_ACTIVITY_ID,
     meals,
-    afternoon: afternoonVisits.length > 0 ? joinTitles(afternoonVisits) : "Tarde sin actividades programadas.",
+    afternoon: afternoonVisits.length > 0 ? joinTitles(afternoonVisits) : EMPTY_SLOT_TEXT.afternoon,
     afternoonActivityId: activityIdOf(afternoonVisits),
-    night: nightVisits.length > 0 ? joinTitles(nightVisits) : "Noche sin actividades programadas.",
+    night: nightVisits.length > 0 ? joinTitles(nightVisits) : EMPTY_SLOT_TEXT.night,
     stops,
     placesVerification: dayConfidence(visits),
   };

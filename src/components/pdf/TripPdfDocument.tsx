@@ -1,9 +1,10 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { SearchParams, TripProposal } from "../../types";
-import { formatDate } from "../../utils/dates";
+import { formatDate, formatDateRange } from "../../utils/dates";
 import { formatDistance } from "../../utils/format";
 import { TIER_THEME } from "../../constants/tierTheme";
 import { getEffectiveRestaurant, getEffectiveText } from "../../utils/itineraryEdits";
+import { isEmptySlot } from "../../utils/emptySlot";
 
 interface TripPdfDocumentProps {
   proposal: TripProposal;
@@ -19,6 +20,13 @@ const TIER_HEX: Record<TripProposal["tier"], string> = {
   medio: "#6366f1",
   caro: "#f59e0b",
 };
+
+// Una franja vacía se resume en "Libre" en vez de repetir "Mañana sin
+// actividades programadas." una vez por franja y por día. En un PDF de ocho
+// días eso eran hasta veinticuatro frases diciendo lo mismo.
+function slotText(text: string, vacio = "Libre"): string {
+  return isEmptySlot(text) ? vacio : text;
+}
 
 const styles = StyleSheet.create({
   page: {
@@ -145,6 +153,15 @@ const styles = StyleSheet.create({
     color: "#8b90a0",
     marginTop: 6,
   },
+  footerNote: {
+    position: "absolute",
+    bottom: 34,
+    left: 40,
+    right: 40,
+    fontSize: 8,
+    color: "#8b90a0",
+    textAlign: "center",
+  },
   footer: {
     position: "absolute",
     bottom: 20,
@@ -173,8 +190,8 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
             {searchParams.origin} → {searchParams.destination}
           </Text>
           <Text style={styles.coverMeta}>
-            {formatDate(searchParams.departureDate)} – {formatDate(searchParams.returnDate)} · {itinerary.totalDays}{" "}
-            días · {itinerary.totalNights} noches
+            {formatDateRange(searchParams.departureDate, searchParams.returnDate)} · {itinerary.totalDays} días ·{" "}
+            {itinerary.totalNights} noches
           </Text>
           <Text style={styles.coverMeta}>
             {travelers} viajero{travelers > 1 ? "s" : ""}
@@ -200,7 +217,7 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
 
               <View style={styles.block}>
                 <Text style={styles.blockLabel}>MAÑANA</Text>
-                <Text style={styles.blockText}>{getEffectiveText(day, "morning")}</Text>
+                <Text style={styles.blockText}>{slotText(getEffectiveText(day, "morning"))}</Text>
               </View>
 
               {restaurant ? (
@@ -216,10 +233,13 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
                     <Text style={styles.blockLabel}>
                       {meal.title.toUpperCase()} · {meal.time}
                     </Text>
+                    {/* Igual que en pantalla: el dato útil, sin la disculpa
+                        repetida. En un PDF de ocho días salía dieciséis
+                        veces. Se dice una sola vez, en el pie. */}
                     <Text style={styles.blockText}>
                       {meal.costPerPerson !== undefined
-                        ? `Presupuesto estimado de ${meal.costPerPerson}€ por persona. Aún sin restaurante asignado.`
-                        : "Aún sin restaurante asignado."}
+                        ? `Presupuesto estimado de ${meal.costPerPerson}€ por persona.`
+                        : "Presupuesto de comida incluido en el total."}
                     </Text>
                   </View>
                 ))
@@ -227,16 +247,32 @@ export function TripPdfDocument({ proposal, searchParams, heroImageUrl }: TripPd
 
               <View style={styles.block}>
                 <Text style={styles.blockLabel}>TARDE</Text>
-                <Text style={styles.blockText}>{getEffectiveText(day, "afternoon")}</Text>
+                <Text style={styles.blockText}>{slotText(getEffectiveText(day, "afternoon"))}</Text>
               </View>
 
-              <View style={styles.nightBlock}>
-                <Text style={styles.blockLabel}>NOCHE</Text>
-                <Text style={styles.nightText}>{getEffectiveText(day, "night")}</Text>
-              </View>
+              {/* La misma decisión que en pantalla: el recuadro oscuro solo
+                  cuando hay plan de noche. En un viaje normal las ocho noches
+                  están libres, y ocho recuadros negros diciendo que no pasa
+                  nada es tinta y peso visual a cambio de nada. */}
+              {!isEmptySlot(getEffectiveText(day, "night")) ? (
+                <View style={styles.nightBlock}>
+                  <Text style={styles.blockLabel}>NOCHE</Text>
+                  <Text style={styles.nightText}>{getEffectiveText(day, "night")}</Text>
+                </View>
+              ) : (
+                <View style={styles.block}>
+                  <Text style={styles.blockLabel}>NOCHE</Text>
+                  <Text style={styles.blockText}>Libre</Text>
+                </View>
+              )}
             </View>
           );
         })}
+        {/* La advertencia sobre los restaurantes, dicha una vez en el pie en
+            vez de dieciséis veces dentro del itinerario. */}
+        <Text style={styles.footerNote} fixed>
+          Las comidas llevan hora y presupuesto estimado; todavía no proponemos restaurantes concretos.
+        </Text>
         <Text
           style={styles.footer}
           fixed

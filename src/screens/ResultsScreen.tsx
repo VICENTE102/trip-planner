@@ -13,6 +13,7 @@ import { useTrips } from "../hooks/useTrips";
 import { useDestinationImage } from "../hooks/useDestinationImage";
 import { TIER_THEME } from "../constants/tierTheme";
 import { track } from "../services/analytics";
+import { formatDateRange } from "../utils/dates";
 
 interface ResultsLocationState {
   searchParams: SearchParams;
@@ -105,8 +106,9 @@ export function ResultsScreen() {
             {searchParams.destination}
           </h1>
           <p className="text-white/85 lg:text-lg">
-            {searchParams.origin} → {searchParams.destination} · {searchParams.departureDate} →{" "}
-            {searchParams.returnDate} · {searchParams.travelers + searchParams.children} viajero
+            {searchParams.origin} → {searchParams.destination} ·{" "}
+            {formatDateRange(searchParams.departureDate, searchParams.returnDate)} ·{" "}
+            {searchParams.travelers + searchParams.children} viajero
             {searchParams.travelers + searchParams.children > 1 ? "s" : ""}
           </p>
           <p className="mt-1 text-lg font-semibold lg:text-xl">

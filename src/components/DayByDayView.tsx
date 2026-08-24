@@ -6,6 +6,7 @@ import type { TabItem } from "./Tabs";
 import { DayCard } from "./DayCard";
 import { DayMapLazy } from "./DayMapLazy";
 import { DayRoute } from "./DayRoute";
+import { ItineraryNote } from "./ItineraryNote";
 
 interface DayByDayViewProps {
   itinerary: Itinerary;
@@ -34,6 +35,8 @@ export function DayByDayView({ itinerary, searchParams, tier, editable, onUpdate
         activeId={String(selectedDayNumber)}
         onChange={(id) => setSelectedDayNumber(Number(id))}
       />
+
+      <ItineraryNote />
 
       {/* El `key` va en la tarjeta, no en la rejilla. Estando en la rejilla,
           React desmontaba y volvía a montar TODO el subárbol en cada cambio

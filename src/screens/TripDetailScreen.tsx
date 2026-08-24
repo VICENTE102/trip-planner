@@ -3,6 +3,7 @@ import type { ItineraryDay } from "../types";
 import { useTrips } from "../hooks/useTrips";
 import { ProposalDetailView } from "../components/ProposalDetailView";
 import { Icon } from "../components/Icon";
+import { formatDateRange } from "../utils/dates";
 
 export function TripDetailScreen() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -44,8 +45,9 @@ export function TripDetailScreen() {
           {searchParams.destination}
         </h1>
         <p className="text-sm text-ink-500">
-          {searchParams.origin} → {searchParams.destination} · {searchParams.departureDate} →{" "}
-          {searchParams.returnDate} · {searchParams.travelers + searchParams.children} viajero
+          {searchParams.origin} → {searchParams.destination} ·{" "}
+          {formatDateRange(searchParams.departureDate, searchParams.returnDate)} ·{" "}
+          {searchParams.travelers + searchParams.children} viajero
           {searchParams.travelers + searchParams.children > 1 ? "s" : ""}
         </p>
       </div>
